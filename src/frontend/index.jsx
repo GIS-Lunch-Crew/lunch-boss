@@ -11,7 +11,7 @@ const App = () => {
 
   return (
     <>
-      <Text>Hello world!</Text>
+      <Text>Hello world! yo</Text>
       <Text>{data ? data : 'Loading...'}</Text>
     </>
   );
