@@ -1,0 +1,20 @@
+modules:
+  macro:
+    - key: lunch-boss-hello-world-macro
+      resource: main
+      render: native
+      resolver:
+        function: resolver
+      title: lunch-boss
+  function:
+    - key: resolver
+      handler: index.handler
+resources:
+  - key: main
+    path: src/frontend/index.jsx
+app:
+  runtime:
+    name: nodejs24.x
+    memoryMB: 256
+    architecture: arm64
+  id: ari:cloud:ecosystem::app/e7efcf7b-5295-404d-9d0d-e196f590c88b
