@@ -95,3 +95,13 @@ export const removeSavedRestaurant = async (
   accountId: string,
   restaurantId: number
 ): Promise<void> => savedRestaurantRepository.remove(accountId, restaurantId);
+
+// Global soft delete — no ownership check (CONTEXT.md §3.10). Pool rows in
+// user_saved_restaurants are intentionally untouched so a later resurrect
+// restores the restaurant to everyone who had it saved.
+export const deleteRestaurant = async (restaurantId: number): Promise<void> => {
+  const affectedRows = await restaurantRepository.softDelete(restaurantId);
+  if (affectedRows === 0) {
+    throw new Error("Restaurant not found.");
+  }
+};

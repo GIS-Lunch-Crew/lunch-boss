@@ -22,11 +22,19 @@ type Props = {
   busy: boolean;
   onSubmit: (fields: RestaurantFields) => void;
   onCancel: () => void;
+  // Global soft delete; recoverable by re-adding the same identity.
+  onDelete: (restaurantId: number) => void;
 };
 
 // Field state is local, initialized from `editing`; the parent remounts this
 // component (via key) when edit mode starts/ends so fields reset or prefill.
-const RestaurantForm = ({ editing, busy, onSubmit, onCancel }: Props) => {
+const RestaurantForm = ({
+  editing,
+  busy,
+  onSubmit,
+  onCancel,
+  onDelete,
+}: Props) => {
   const [name, setName] = useState(editing?.name ?? "");
   const [phone, setPhone] = useState(editing?.phone ?? "");
   const [address, setAddress] = useState(editing?.address ?? "");
@@ -77,9 +85,18 @@ const RestaurantForm = ({ editing, busy, onSubmit, onCancel }: Props) => {
           {editing ? "Save changes" : "Add to my pool"}
         </Button>
         {editing && (
-          <Button appearance="subtle" isDisabled={busy} onClick={onCancel}>
-            Cancel
-          </Button>
+          <>
+            <Button appearance="subtle" isDisabled={busy} onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button
+              appearance="danger"
+              isDisabled={busy}
+              onClick={() => onDelete(editing.id)}
+            >
+              Delete restaurant
+            </Button>
+          </>
         )}
       </Inline>
     </Stack>

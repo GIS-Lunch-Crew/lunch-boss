@@ -115,6 +115,17 @@ export const update = async (
   return result.rows.affectedRows;
 };
 
+export const softDelete = async (id: number): Promise<number> => {
+  const result = await sql
+    .prepare<UpdateQueryResponse>(
+      "UPDATE restaurants SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL",
+    )
+    .bindParams(id)
+    .execute();
+
+  return result.rows.affectedRows;
+};
+
 // Clears a soft delete (CONTEXT.md §3.10 resurrect-on-readd).
 export const resurrect = async (id: number): Promise<void> => {
   await sql

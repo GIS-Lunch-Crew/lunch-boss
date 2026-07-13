@@ -39,6 +39,14 @@ export const registerRestaurantResolvers = (resolver: Resolver): void => {
   );
 
   resolver.define<unknown, void>(
+    "deleteRestaurant",
+    async ({ payload }) => {
+      const { restaurantId } = restaurantIdSchema.parse(payload);
+      await restaurantService.deleteRestaurant(restaurantId);
+    },
+  );
+
+  resolver.define<unknown, void>(
     "removeSavedRestaurant",
     async ({ payload, context }) => {
       const { restaurantId } = restaurantIdSchema.parse(payload);

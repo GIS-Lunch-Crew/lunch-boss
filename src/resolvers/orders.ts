@@ -1,11 +1,16 @@
 import type Resolver from "@forge/resolver";
 import {
+  getOrdersSchema,
   submitOrderSchema,
   updateSubmissionSchema,
 } from "../validation/orderSchemas";
 import * as orderService from "../services/orderService";
 import { requireAccountId } from "./context";
-import type { CurrentSubmission, CurrentSubmissionResult } from "../types";
+import type {
+  CurrentSubmission,
+  CurrentSubmissionResult,
+  PlacedOrder,
+} from "../types";
 
 export const registerOrderResolvers = (resolver: Resolver): void => {
   resolver.define<void, CurrentSubmissionResult>(
@@ -30,6 +35,14 @@ export const registerOrderResolvers = (resolver: Resolver): void => {
     async ({ payload, context }) => {
       const input = updateSubmissionSchema.parse(payload);
       await orderService.updateSubmission(requireAccountId(context), input);
+    },
+  );
+
+  resolver.define<unknown, PlacedOrder[]>(
+    "getOrders",
+    async ({ payload, context }) => {
+      const input = getOrdersSchema.parse(payload ?? {});
+      return orderService.getOrders(requireAccountId(context), input);
     },
   );
 

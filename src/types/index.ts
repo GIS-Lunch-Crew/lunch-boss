@@ -69,3 +69,20 @@ export type UpdateSubmissionInput = {
   total?: number;
   notes?: string;
 };
+
+// Immutable placed-order history (CONTEXT.md §3.12).
+export type PlacedOrder = {
+  id: number;
+  restaurantId: number;
+  restaurantName: string;
+  items: string | null;
+  total: number | null;
+  notes: string | null;
+  orderedAt: string;
+};
+
+// Inclusive YYYY-MM-DD bounds; both optional.
+export type GetOrdersInput = {
+  from?: string;
+  to?: string;
+};

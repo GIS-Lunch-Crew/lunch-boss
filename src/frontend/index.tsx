@@ -10,6 +10,11 @@ import ForgeReconciler, {
 import { invoke, view } from "@forge/bridge";
 import { describeError, unwrap } from "./lib/invoke";
 import CurrentOrder from "./components/CurrentOrder";
+import type {
+  OrderPrefill,
+  SelectionTarget,
+} from "./components/CurrentOrder";
+import OrderHistory from "./components/OrderHistory";
 import RestaurantForm from "./components/RestaurantForm";
 import type { RestaurantFields } from "./components/RestaurantForm";
 import RestaurantTable from "./components/RestaurantTable";
@@ -17,6 +22,7 @@ import type {
   AddRestaurantResult,
   CurrentSubmission,
   CurrentSubmissionResult,
+  PlacedOrder,
   Restaurant,
 } from "../types";
 
@@ -56,8 +62,17 @@ const App = () => {
   const [submission, setSubmission] = useState<
     CurrentSubmission | null | undefined
   >(undefined);
-  const [selected, setSelected] = useState<Restaurant | null>(null);
+  const [selected, setSelected] = useState<SelectionTarget | null>(null);
+  const [prefill, setPrefill] = useState<OrderPrefill | null>(null);
+  // Bumped on every startSelection so CurrentOrder remounts (and its fields
+  // reset/prefill) even when the same restaurant is selected again.
+  const [selectionVersion, setSelectionVersion] = useState(0);
   const [editing, setEditing] = useState<Restaurant | null>(null);
+  const [orders, setOrders] = useState<PlacedOrder[] | null>(null);
+  const [orderFilter, setOrderFilter] = useState<{
+    from?: string;
+    to?: string;
+  }>({});
   const [message, setMessage] = useState<Message | null>(null);
   const [busy, setBusy] = useState(false);
   const [environmentType, setEnvironmentType] = useState<string | null>(null);
@@ -92,6 +107,22 @@ const App = () => {
       .getContext()
       .then((context) => setEnvironmentType(context.environmentType));
   }, [refresh, refreshSubmission]);
+
+  const refreshOrders = useCallback(async () => {
+    try {
+      setOrders(
+        unwrap(await invoke<PlacedOrder[]>("getOrders", { ...orderFilter })),
+      );
+    } catch (error) {
+      setMessage({ appearance: "error", text: describeError(error) });
+      setOrders([]);
+    }
+  }, [orderFilter]);
+
+  // Separate effect so pool/submission don't refetch on filter changes.
+  useEffect(() => {
+    refreshOrders();
+  }, [refreshOrders]);
 
   // Wraps a mutation handler with the shared busy/message bookkeeping.
   const runAction = async (action: () => Promise<void>) => {
@@ -141,9 +172,20 @@ const App = () => {
 
   // --- Order lifecycle (CONTEXT.md §3.12) ---
 
-  const startSelection = (restaurant: Restaurant) => {
+  const startSelection = (
+    target: SelectionTarget,
+    withPrefill?: OrderPrefill,
+  ) => {
     setMessage(null);
-    setSelected(restaurant);
+    setSelected(target);
+    // No prefill (plain select / random pick) clears any staged re-order.
+    setPrefill(withPrefill ?? null);
+    setSelectionVersion((version) => version + 1);
+  };
+
+  const cancelSelection = () => {
+    setSelected(null);
+    setPrefill(null);
   };
 
   const pickRandom = () => {
@@ -153,6 +195,12 @@ const App = () => {
     }
     startSelection(pool[Math.floor(Math.random() * pool.length)]);
   };
+
+  const handleReorder = (order: PlacedOrder) =>
+    startSelection(
+      { id: order.restaurantId, name: order.restaurantName },
+      { items: order.items, total: order.total, notes: order.notes },
+    );
 
   const handleSubmitOrder = (
     itemsText: string,
@@ -181,7 +229,11 @@ const App = () => {
       );
       setSubmission(created);
       setSelected(null);
+      setPrefill(null);
       setMessage({ appearance: "success", text: "Order submitted." });
+      // The submit may have resurrected a deleted restaurant or linked one
+      // into the pool server-side — refetch so the table reflects it.
+      await refresh();
     });
   };
 
@@ -221,6 +273,18 @@ const App = () => {
       await invoke("placeOrder");
       setSubmission(null);
       setMessage({ appearance: "success", text: "Order placed." });
+      await refreshOrders();
+    });
+
+  const handleDelete = (restaurantId: number) =>
+    runAction(async () => {
+      await invoke("deleteRestaurant", { restaurantId });
+      setEditing(null);
+      if (selected?.id === restaurantId) {
+        setSelected(null);
+      }
+      setMessage({ appearance: "information", text: "Restaurant deleted." });
+      await refresh();
     });
 
   // Dev-only; hidden in production and guarded resolver-side too.
@@ -246,7 +310,7 @@ const App = () => {
       : submission
         ? `sub-${submission.restaurantId}-${submission.items ?? ""}-${submission.total ?? ""}-${submission.notes ?? ""}`
         : selected
-          ? `sel-${selected.id}`
+          ? `sel-${selected.id}-v${selectionVersion}`
           : "none";
   const restaurantFormKey = editing ? `edit-${editing.id}` : `add-${formVersion}`;
 
@@ -271,10 +335,11 @@ const App = () => {
         key={orderKey}
         submission={submission}
         selected={selected}
+        prefill={prefill}
         busy={busy}
         poolEmpty={(restaurants ?? []).length === 0}
         onPickRandom={pickRandom}
-        onCancelSelection={() => setSelected(null)}
+        onCancelSelection={cancelSelection}
         onSubmitOrder={handleSubmitOrder}
         onSaveSubmission={handleSaveSubmission}
         onClearSubmission={handleClearSubmission}
@@ -287,6 +352,7 @@ const App = () => {
         busy={busy}
         onSubmit={handleRestaurantSubmit}
         onCancel={() => setEditing(null)}
+        onDelete={handleDelete}
       />
 
       <RestaurantTable
@@ -299,6 +365,17 @@ const App = () => {
           setEditing(restaurant);
         }}
         onRemove={handleRemove}
+      />
+
+      <OrderHistory
+        key={`history-${orderFilter.from ?? ""}-${orderFilter.to ?? ""}`}
+        orders={orders}
+        from={orderFilter.from}
+        to={orderFilter.to}
+        busy={busy}
+        reorderDisabled={submission != null}
+        onFilterChange={(from, to) => setOrderFilter({ from, to })}
+        onReorder={handleReorder}
       />
     </Stack>
   );

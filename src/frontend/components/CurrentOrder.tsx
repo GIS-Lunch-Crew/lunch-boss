@@ -11,13 +11,28 @@ import {
   TextArea,
   Textfield,
 } from "@forge/react";
-import type { CurrentSubmission, Restaurant } from "../../types";
+import type { CurrentSubmission } from "../../types";
+
+// All the selection stage needs to render — a full Restaurant satisfies it,
+// and so does a history row (which only carries id + name).
+export type SelectionTarget = {
+  id: number;
+  name: string;
+};
+
+// Staged field values for a re-order from history.
+export type OrderPrefill = {
+  items: string | null;
+  total: number | null;
+  notes: string | null;
+};
 
 type Props = {
   // undefined = still loading, null = no submitted order.
   submission: CurrentSubmission | null | undefined;
   // Frontend-only "selecting" stage (CONTEXT.md §3.12).
-  selected: Restaurant | null;
+  selected: SelectionTarget | null;
+  prefill: OrderPrefill | null;
   busy: boolean;
   poolEmpty: boolean;
   onPickRandom: () => void;
@@ -41,6 +56,7 @@ type Props = {
 const CurrentOrder = ({
   submission,
   selected,
+  prefill,
   busy,
   poolEmpty,
   onPickRandom,
@@ -50,11 +66,19 @@ const CurrentOrder = ({
   onClearSubmission,
   onPlaceOrder,
 }: Props) => {
-  const [items, setItems] = useState(submission?.items ?? "");
-  const [total, setTotal] = useState(
-    submission?.total != null ? String(submission.total) : "",
+  const [items, setItems] = useState(
+    submission?.items ?? prefill?.items ?? "",
   );
-  const [notes, setNotes] = useState(submission?.notes ?? "");
+  const [total, setTotal] = useState(
+    submission?.total != null
+      ? String(submission.total)
+      : prefill?.total != null
+        ? String(prefill.total)
+        : "",
+  );
+  const [notes, setNotes] = useState(
+    submission?.notes ?? prefill?.notes ?? "",
+  );
   // Submitted orders are read-only until the user explicitly edits them.
   const [editingDetails, setEditingDetails] = useState(false);
 

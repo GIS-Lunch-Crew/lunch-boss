@@ -1,8 +1,11 @@
 import * as restaurantRepository from "../storage/restaurantRepository";
+import * as savedRestaurantRepository from "../storage/savedRestaurantRepository";
 import * as submissionRepository from "../storage/submissionRepository";
 import * as orderRepository from "../storage/orderRepository";
 import type {
   CurrentSubmission,
+  GetOrdersInput,
+  PlacedOrder,
   SubmitOrderInput,
   UpdateSubmissionInput,
 } from "../types";
@@ -31,9 +34,17 @@ export const submitOrder = async (
   }
 
   const restaurant = await restaurantRepository.findById(input.restaurantId);
-  if (restaurant === null || restaurant.deletedAt !== null) {
+  if (restaurant === null) {
     throw new Error("Restaurant not found.");
   }
+  // Invariant: submitting an order to a restaurant brings it back if it was
+  // soft-deleted and ensures it's in the caller's pool (idempotent save).
+  // Covers re-orders of deleted restaurants and the race where a restaurant
+  // is deleted while someone has it selected.
+  if (restaurant.deletedAt !== null) {
+    await restaurantRepository.resurrect(restaurant.id);
+  }
+  await savedRestaurantRepository.save(accountId, restaurant.id);
 
   // The check above is a friendly guard; the PRIMARY KEY on account_id is
   // the real one-per-user enforcement if two devices race past it.
@@ -70,6 +81,12 @@ export const updateSubmission = async (
     orNull(input.notes),
   );
 };
+
+export const getOrders = async (
+  accountId: string,
+  input: GetOrdersInput,
+): Promise<PlacedOrder[]> =>
+  orderRepository.listByAccount(accountId, input.from, input.to);
 
 export const clearSubmission = async (accountId: string): Promise<void> => {
   await submissionRepository.remove(accountId);
