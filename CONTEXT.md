@@ -171,7 +171,8 @@ pain shows up, not scaffolding on day one.
     duplicate during *create*, don't error — link the existing restaurant to
     the user's pool instead (turns the failure case into the desired
     feature). On *edit*, run the same check against every row except the one
-    being edited.
+    being edited — but unlike create, a collision on edit is **rejected with
+    an error** (silently merging two restaurants would be surprising).
   - Migration layer (backstop): composite `UNIQUE (name, phone, address)`.
 - **NULL gotcha:** MySQL unique indexes treat `NULL != NULL`, so optional
   fields are stored as `NOT NULL DEFAULT ''` and the app treats `''` as "not
@@ -318,7 +319,7 @@ from `req.context.accountId` — the frontend never sends its own identity.
 | `getSavedRestaurants`  | —                              | List caller's pool (joined restaurant details, excludes soft-deleted) |
 | `addRestaurant`        | `{ name, phone?, address?, website?, menuUrl? }` | Normalized duplicate check → create new / link existing / resurrect soft-deleted; always ends with restaurant in caller's pool |
 | `removeSavedRestaurant`| `{ restaurantId }`             | Remove from caller's pool only (restaurant row untouched) |
-| `updateRestaurant`     | `{ restaurantId, ...fields }`  | Global edit, any user; duplicate check excluding self |
+| `updateRestaurant`     | `{ restaurantId, ...fields }`  | Global edit, any user; duplicate check excluding self — collision rejected with error. UI: the add form doubles as the edit form (Edit button on a row pre-fills it; heading/buttons switch to edit mode) |
 | `deleteRestaurant`     | `{ restaurantId }`             | Soft delete (sets `deleted_at`), global |
 
 ### Orders (`src/resolvers/orders.ts`)

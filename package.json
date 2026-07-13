@@ -20,6 +20,8 @@
     "@forge/bridge": "6.1.0-next.8",
     "@forge/react": "12.0.1-next.1",
     "@forge/resolver": "2.0.0",
-    "react": "^18.2.0"
+    "@forge/sql": "^4.0.1",
+    "react": "^18.2.0",
+    "zod": "^4.4.3"
   }
 }
