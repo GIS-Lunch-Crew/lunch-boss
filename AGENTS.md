@@ -12,8 +12,11 @@ You should use verbose commentary in the code. Your comments should be such that
 # Imports & Libraries
 
 You may import packages from reputable npm libraries when needed.
-You MUST only use UI Kit components available in @forge/react. Forge ONLY supports components from @forge/react. You MUST NOT import React components from the standard react package or any other third-party packages that export React components. Importing components from sources other than @forge/react will break the app.
-The @forge/ui package is deprecated and MUST NOT be used. Importing from this package will break the app.
+This app has modules of both UI Kit and Custom UI, so the import rules depend on which kind of module you're editing:
+- **UI Kit modules** (manifest has `render: native`, frontend imports from `@forge/react`): you MUST only use UI Kit components available in `@forge/react`. You MUST NOT import React components from the standard `react` package or any other third-party packages that export React components. Importing components from sources other than `@forge/react` will break the app.
+- **Custom UI modules** (manifest `resource` points at a built static bundle directory, e.g. this app's `static/lunch-boss/`, no `render: native`): the frontend runs as a normal iframed web app with its own `package.json`. Plain `react`/`react-dom`, HTML elements, CSS, and reputable third-party frontend npm packages are all fine here — this restriction does not apply.
+
+The @forge/ui package is deprecated and MUST NOT be used in either kind of module. Importing from this package will break the app.
 
 You must install packages using the project's package manager after creating the app and every time you add or update a dependency.
 
@@ -38,19 +41,23 @@ Before creating a new app, ALWAYS check whether a directory with that name alrea
 When creating a new app, ALWAYS use the command `forge create -t <template-name> <app-name>`.
 Always use one of the following templates when creating apps: action-rovo,confluence-content-action-ui-kit,confluence-content-byline-ui-kit,confluence-context-menu-ui-kit,confluence-global-page-ui-kit,confluence-global-settings-ui-kit,confluence-homepage-feed-ui-kit,confluence-macro-ui-kit,confluence-macro-with-custom-configuration-ui-kit,confluence-space-page-ui-kit,confluence-space-settings-ui-kit,jira-admin-page-ui-kit,jira-backlog-action-ui-kit,jira-board-action-ui-kit,jira-command-ui-kit,jira-custom-field-type-ui-kit,jira-custom-field-ui-kit,jira-dashboard-background-script-ui-kit,jira-dashboard-gadget-ui-kit,jira-entity-property,jira-global-page-ui-kit,jira-global-permission,jira-issue-action-ui-kit,jira-issue-activity-ui-kit,jira-issue-context-ui-kit,jira-issue-glance-ui-kit,jira-issue-navigator-action-ui-kit,jira-issue-panel-ui-kit,jira-issue-view-background-script-ui-kit,jira-jql-function,jira-personal-settings-page-ui-kit,jira-project-page-ui-kit,jira-project-permission,jira-project-settings-page-ui-kit,jira-service-management-assets-import-type-ui-kit,jira-service-management-organization-panel-ui-kit,jira-service-management-portal-footer-ui-kit,jira-service-management-portal-header-ui-kit,jira-service-management-portal-profile-panel-ui-kit,jira-service-management-portal-request-create-property-panel-ui-kit,jira-service-management-portal-request-detail-panel-ui-kit,jira-service-management-portal-request-detail-ui-kit,jira-service-management-portal-request-view-action-ui-kit,jira-service-management-portal-subheader-ui-kit,jira-service-management-portal-user-menu-action-ui-kit,jira-service-management-queue-page-ui-kit,jira-sprint-action-ui-kit,jira-time-tracking-provider,jira-workflow-condition,jira-workflow-postfunction,jira-workflow-validator,product-trigger,rovo-agent-rovo,scheduled-trigger,webtrigger
 Never use an empty template, always use one of the templates listed above.
-You are not authorised to use to custom-ui for creating apps, only ui-kit.
+This app uses both UI Kit and Custom UI across its modules, chosen per-module based on that module's actual UI needs: default to UI Kit for simplicity (no separate build tooling to maintain), but use Custom UI when a module needs custom DOM/CSS/animation/SVG/canvas that UI Kit's fixed native component set can't provide — as already done for this app's `lunch-boss-hello-world-macro` module (its spinning wheel needed real CSS transform animation, so its frontend lives in `static/lunch-boss/` as Custom UI). When scaffolding a brand-new module, pick the template matching the UI approach that module actually needs (a `-ui-kit` template vs. a Custom UI template) rather than defaulting to UI Kit for everything.
 If you don't think there is a suitable template, check the list again, and choose the closest one. You can modify it after creation.
 
 After creating the app ALWAYS review the contents of the app directory before editing or creating files. DO NOT assume particular files were automatically created before you have reviewed the directory content.
 
 # UI Development
 
-The front-end of you app is built on Atlassian UI Kit, which has some similarities to React, but does not support all React features.
+This app has modules built on both Atlassian UI Kit and Custom UI. Check the module's `manifest.yml` entry before editing its frontend — the rules below depend on which one it is.
+
+**UI Kit modules** (manifest has `render: native`, frontend imports from `@forge/react` and calls `ForgeReconciler.render`): the front-end is built on Atlassian UI Kit, which has some similarities to React, but does not support all React features.
 You MUST NOT use common React components such as <div>, <strong>, etc. This will cause the app not to render.
 Instead, you MUST ONLY use components exported by UI Kit, which are: Badge, BarChart, Box, Button, ButtonGroup, Calendar, Checkbox, Code, CodeBlock, DatePicker, EmptyState, ErrorMessage, Form, FormFooter, FormHeader, FormSection, Heading, HelperMessage, HorizontalBarChart, HorizontalStackBarChart, Icon, Inline, Label, LineChart, LinkButton, List, ListItem, LoadingButton, Lozenge, Modal, ModalBody, ModalFooter, ModalHeader, ModalTitle, ModalTransition, PieChart, ProgressBar, ProgressTracker, Radio, RadioGroup, Range, Select, SectionMessage, SectionMessageAction, SingleValueChart, Spinner, Stack, StackBarChart, Tab, TabList, TabPanel, Tabs, Tag, TagGroup, TextArea, Textfield, TimePicker, Toggle, Tooltip, Text, ValidMessage, RequiredAsterisk, Image, Link, UserPicker, User, UserGroup, Em, Strike, Strong, Frame, DynamicTable, InlineEdit, Popup, AdfRenderer
-If your resolver no longer contains any definitions, you may delete it and remove it from the manifest.
-
 Note that THERE IS NOT UI KIT COMPONENT NAMED "Table" - always use "DynamicTable" instead! Using "Table" will cause the app not to render.
+
+**Custom UI modules** (manifest `resource` points at a built static bundle directory, no `render: native` — e.g. this app's `lunch-boss-hello-world-macro` module, whose frontend lives in `static/lunch-boss/`): the frontend runs as a normal iframed web app built with its own bundler (this app uses Vite — see `static/lunch-boss/vite.config.js`, which sets `base: './'` since Forge serves Custom UI resources from a non-root path). Plain HTML elements, CSS, and third-party frontend npm packages are all fine — the UI Kit component whitelist above does not apply. The build output directory (e.g. `static/lunch-boss/build/`) must exist and be up to date before `forge deploy`, since deploy just ships whatever's already in that directory — run the module's frontend build script first.
+
+Regardless of module type: if a resolver no longer contains any definitions, you may delete it and remove it from the manifest.
 
 # Storing Data
 
