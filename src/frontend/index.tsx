@@ -1,29 +1,24 @@
 import React, { useCallback, useEffect, useState } from "react";
 import ForgeReconciler, {
   Button,
-  DynamicTable,
   Heading,
   Inline,
-  Label,
   SectionMessage,
-  Spinner,
   Stack,
   Text,
-  Textfield,
 } from "@forge/react";
 import { invoke, view } from "@forge/bridge";
-import type { AddRestaurantResult, Restaurant } from "../types";
-
-// invoke() may return the value directly or wrapped as { body, metadata };
-// none of our resolver return types have a `body` field, so this check is a
-// safe way to unwrap either form.
-const unwrap = <T,>(value: T | { body: T }): T =>
-  typeof value === "object" && value !== null && "body" in value
-    ? (value as { body: T }).body
-    : (value as T);
-
-const describeError = (error: unknown): string =>
-  error instanceof Error ? error.message : "Something went wrong";
+import { describeError, unwrap } from "./lib/invoke";
+import CurrentOrder from "./components/CurrentOrder";
+import RestaurantForm from "./components/RestaurantForm";
+import type { RestaurantFields } from "./components/RestaurantForm";
+import RestaurantTable from "./components/RestaurantTable";
+import type {
+  AddRestaurantResult,
+  CurrentSubmission,
+  CurrentSubmissionResult,
+  Restaurant,
+} from "../types";
 
 type Message = {
   appearance: "success" | "information" | "error";
@@ -38,7 +33,7 @@ const OUTCOME_MESSAGES: Record<AddRestaurantResult["outcome"], Message> = {
   },
   "linked-existing": {
     appearance: "information",
-    text: "Restaurant is now in your pool.",
+    text: "Restaurant added to your pool.",
   },
   resurrected: {
     appearance: "information",
@@ -46,26 +41,28 @@ const OUTCOME_MESSAGES: Record<AddRestaurantResult["outcome"], Message> = {
   },
 };
 
+// "" = omitted; anything unparseable or negative is rejected.
+const parseTotal = (text: string): number | undefined | "invalid" => {
+  if (text.trim() === "") {
+    return undefined;
+  }
+  const value = Number(text);
+  return Number.isNaN(value) || value < 0 ? "invalid" : value;
+};
+
 const App = () => {
-  // null = initial load still in flight (renders a spinner).
+  // null = pool still loading; undefined = submission still loading.
   const [restaurants, setRestaurants] = useState<Restaurant[] | null>(null);
+  const [submission, setSubmission] = useState<
+    CurrentSubmission | null | undefined
+  >(undefined);
+  const [selected, setSelected] = useState<Restaurant | null>(null);
+  const [editing, setEditing] = useState<Restaurant | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
   const [busy, setBusy] = useState(false);
-  // When set, the form below operates in edit mode for this restaurant.
-  const [editing, setEditing] = useState<Restaurant | null>(null);
-  // null until view.getContext() resolves; the migrations button only
-  // renders once we know we're NOT in production.
   const [environmentType, setEnvironmentType] = useState<string | null>(null);
-
-  // Controlled add-restaurant form fields.
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [website, setWebsite] = useState("");
-  const [menuUrl, setMenuUrl] = useState("");
-  // Textfields are cleared after a successful add by bumping this key,
-  // which remounts them with empty values.
-  const [formKey, setFormKey] = useState(0);
+  // Bumped after a successful add so the (uncontrolled) form fields clear.
+  const [formVersion, setFormVersion] = useState(0);
 
   const refresh = useCallback(async () => {
     try {
@@ -76,83 +73,159 @@ const App = () => {
     }
   }, []);
 
+  const refreshSubmission = useCallback(async () => {
+    try {
+      const result = unwrap(
+        await invoke<CurrentSubmissionResult>("getCurrentSubmission"),
+      );
+      setSubmission(result?.submission ?? null);
+    } catch (error) {
+      setMessage({ appearance: "error", text: describeError(error) });
+      setSubmission(null);
+    }
+  }, []);
+
   useEffect(() => {
     refresh();
+    refreshSubmission();
     view
       .getContext()
       .then((context) => setEnvironmentType(context.environmentType));
-  }, [refresh]);
+  }, [refresh, refreshSubmission]);
 
-  const clearForm = () => {
-    setName("");
-    setPhone("");
-    setAddress("");
-    setWebsite("");
-    setMenuUrl("");
-    setEditing(null);
-    setFormKey((key) => key + 1);
-  };
-
-  const startEdit = (restaurant: Restaurant) => {
-    setMessage(null);
-    setName(restaurant.name);
-    setPhone(restaurant.phone);
-    setAddress(restaurant.address);
-    setWebsite(restaurant.website ?? "");
-    setMenuUrl(restaurant.menuUrl ?? "");
-    setEditing(restaurant);
-    setFormKey((key) => key + 1);
-  };
-
-  const handleSubmit = async () => {
+  // Wraps a mutation handler with the shared busy/message bookkeeping.
+  const runAction = async (action: () => Promise<void>) => {
     setBusy(true);
     setMessage(null);
-    const fields = { name, phone, address, website, menuUrl };
     try {
+      await action();
+    } catch (error) {
+      setMessage({ appearance: "error", text: describeError(error) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // --- Restaurant pool ---
+
+  const handleRestaurantSubmit = (fields: RestaurantFields) =>
+    runAction(async () => {
       if (editing) {
         await invoke("updateRestaurant", {
           restaurantId: editing.id,
           ...fields,
         });
         setMessage({ appearance: "success", text: "Restaurant updated." });
+        setEditing(null);
       } else {
         const result = unwrap(
           await invoke<AddRestaurantResult>("addRestaurant", fields),
         );
         setMessage(OUTCOME_MESSAGES[result.outcome]);
+        setFormVersion((version) => version + 1);
       }
-      clearForm();
       await refresh();
-    } catch (error) {
-      setMessage({ appearance: "error", text: describeError(error) });
-    } finally {
-      setBusy(false);
-    }
-  };
+    });
 
-  const handleRemove = async (restaurantId: number) => {
-    setBusy(true);
-    setMessage(null);
-    try {
+  const handleRemove = (restaurantId: number) =>
+    runAction(async () => {
       await invoke("removeSavedRestaurant", { restaurantId });
       if (editing?.id === restaurantId) {
-        clearForm();
+        setEditing(null);
+      }
+      if (selected?.id === restaurantId) {
+        setSelected(null);
       }
       await refresh();
-    } catch (error) {
-      setMessage({ appearance: "error", text: describeError(error) });
-    } finally {
-      setBusy(false);
-    }
+    });
+
+  // --- Order lifecycle (CONTEXT.md §3.12) ---
+
+  const startSelection = (restaurant: Restaurant) => {
+    setMessage(null);
+    setSelected(restaurant);
   };
 
-  // Dev-only: applies pending SQL migrations on demand while tunnelling,
-  // instead of waiting for the hourly scheduled trigger. Remove this button
-  // once the install-time trigger flow is confirmed.
-  const handleRunMigrations = async () => {
-    setBusy(true);
-    setMessage(null);
-    try {
+  const pickRandom = () => {
+    const pool = restaurants ?? [];
+    if (pool.length === 0) {
+      return;
+    }
+    startSelection(pool[Math.floor(Math.random() * pool.length)]);
+  };
+
+  const handleSubmitOrder = (
+    itemsText: string,
+    totalText: string,
+    notesText: string,
+  ) => {
+    if (!selected) {
+      return;
+    }
+    const total = parseTotal(totalText);
+    if (total === "invalid") {
+      setMessage({
+        appearance: "error",
+        text: "Total must be a non-negative number.",
+      });
+      return;
+    }
+    return runAction(async () => {
+      const created = unwrap(
+        await invoke<CurrentSubmission>("submitOrder", {
+          restaurantId: selected.id,
+          ...(itemsText.trim() !== "" ? { items: itemsText } : {}),
+          ...(total !== undefined ? { total } : {}),
+          ...(notesText.trim() !== "" ? { notes: notesText } : {}),
+        }),
+      );
+      setSubmission(created);
+      setSelected(null);
+      setMessage({ appearance: "success", text: "Order submitted." });
+    });
+  };
+
+  const handleSaveSubmission = (
+    itemsText: string,
+    totalText: string,
+    notesText: string,
+  ) => {
+    const total = parseTotal(totalText);
+    if (total === "invalid") {
+      setMessage({
+        appearance: "error",
+        text: "Total must be a non-negative number.",
+      });
+      return;
+    }
+    return runAction(async () => {
+      await invoke("updateSubmission", {
+        ...(itemsText.trim() !== "" ? { items: itemsText } : {}),
+        ...(total !== undefined ? { total } : {}),
+        ...(notesText.trim() !== "" ? { notes: notesText } : {}),
+      });
+      await refreshSubmission();
+      setMessage({ appearance: "success", text: "Order updated." });
+    });
+  };
+
+  const handleClearSubmission = () =>
+    runAction(async () => {
+      await invoke("clearSubmission");
+      setSubmission(null);
+      setMessage({ appearance: "information", text: "Order cleared." });
+    });
+
+  const handlePlaceOrder = () =>
+    runAction(async () => {
+      await invoke("placeOrder");
+      setSubmission(null);
+      setMessage({ appearance: "success", text: "Order placed." });
+    });
+
+  // Dev-only; hidden in production and guarded resolver-side too.
+  const handleRunMigrations = () =>
+    runAction(async () => {
       const applied = unwrap(await invoke<string[]>("runMigrations"));
       setMessage({
         appearance: "success",
@@ -162,57 +235,20 @@ const App = () => {
             : "Migrations already up to date.",
       });
       await refresh();
-    } catch (error) {
-      setMessage({ appearance: "error", text: describeError(error) });
-    } finally {
-      setBusy(false);
-    }
-  };
+      await refreshSubmission();
+    });
 
-  const tableHead = {
-    cells: [
-      { key: "name", content: "Name" },
-      { key: "phone", content: "Phone" },
-      { key: "address", content: "Address" },
-      { key: "actions", content: "" },
-    ],
-  };
-
-  const tableRows = (restaurants ?? []).map((restaurant) => ({
-    key: String(restaurant.id),
-    cells: [
-      { key: "name", content: restaurant.name },
-      {
-        key: "phone",
-        content: restaurant.phone === "" ? "N/A" : restaurant.phone,
-      },
-      {
-        key: "address",
-        content: restaurant.address === "" ? "N/A" : restaurant.address,
-      },
-      {
-        key: "actions",
-        content: (
-          <Inline space="space.050">
-            <Button
-              appearance="subtle"
-              isDisabled={busy}
-              onClick={() => startEdit(restaurant)}
-            >
-              Edit
-            </Button>
-            <Button
-              appearance="subtle"
-              isDisabled={busy}
-              onClick={() => handleRemove(restaurant.id)}
-            >
-              Remove
-            </Button>
-          </Inline>
-        ),
-      },
-    ],
-  }));
+  // Remount keys: components hold their field state locally and re-read
+  // initial values only on mount, so the key encodes the lifecycle stage.
+  const orderKey =
+    submission === undefined
+      ? "loading"
+      : submission
+        ? `sub-${submission.restaurantId}-${submission.items ?? ""}-${submission.total ?? ""}-${submission.notes ?? ""}`
+        : selected
+          ? `sel-${selected.id}`
+          : "none";
+  const restaurantFormKey = editing ? `edit-${editing.id}` : `add-${formVersion}`;
 
   return (
     <Stack space="space.300">
@@ -231,66 +267,39 @@ const App = () => {
         </SectionMessage>
       )}
 
-      <Stack space="space.100" key={formKey}>
-        <Heading as="h2">
-          {editing ? "Edit restaurant" : "Add a restaurant"}
-        </Heading>
-        <Label labelFor="name">Name (required)</Label>
-        <Textfield
-          id="name"
-          defaultValue={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-        <Label labelFor="phone">Phone</Label>
-        <Textfield
-          id="phone"
-          defaultValue={phone}
-          onChange={(event) => setPhone(event.target.value)}
-        />
-        <Label labelFor="address">Address</Label>
-        <Textfield
-          id="address"
-          defaultValue={address}
-          onChange={(event) => setAddress(event.target.value)}
-        />
-        <Label labelFor="website">Website</Label>
-        <Textfield
-          id="website"
-          defaultValue={website}
-          onChange={(event) => setWebsite(event.target.value)}
-        />
-        <Label labelFor="menuUrl">Menu URL</Label>
-        <Textfield
-          id="menuUrl"
-          defaultValue={menuUrl}
-          onChange={(event) => setMenuUrl(event.target.value)}
-        />
-        <Inline space="space.100">
-          <Button
-            appearance="primary"
-            isDisabled={busy || name.trim() === ""}
-            onClick={handleSubmit}
-          >
-            {editing ? "Save changes" : "Add to my pool"}
-          </Button>
-          {editing && (
-            <Button appearance="subtle" isDisabled={busy} onClick={clearForm}>
-              Cancel
-            </Button>
-          )}
-        </Inline>
-      </Stack>
+      <CurrentOrder
+        key={orderKey}
+        submission={submission}
+        selected={selected}
+        busy={busy}
+        poolEmpty={(restaurants ?? []).length === 0}
+        onPickRandom={pickRandom}
+        onCancelSelection={() => setSelected(null)}
+        onSubmitOrder={handleSubmitOrder}
+        onSaveSubmission={handleSaveSubmission}
+        onClearSubmission={handleClearSubmission}
+        onPlaceOrder={handlePlaceOrder}
+      />
 
-      <Stack space="space.100">
-        <Heading as="h2">My restaurant pool</Heading>
-        {restaurants === null ? (
-          <Spinner label="Loading your restaurants" />
-        ) : restaurants.length === 0 ? (
-          <Text>No restaurants exist yet. Add one above.</Text>
-        ) : (
-          <DynamicTable head={tableHead} rows={tableRows} />
-        )}
-      </Stack>
+      <RestaurantForm
+        key={restaurantFormKey}
+        editing={editing}
+        busy={busy}
+        onSubmit={handleRestaurantSubmit}
+        onCancel={() => setEditing(null)}
+      />
+
+      <RestaurantTable
+        restaurants={restaurants}
+        busy={busy}
+        selectionDisabled={submission != null}
+        onSelect={startSelection}
+        onEdit={(restaurant) => {
+          setMessage(null);
+          setEditing(restaurant);
+        }}
+        onRemove={handleRemove}
+      />
     </Stack>
   );
 };

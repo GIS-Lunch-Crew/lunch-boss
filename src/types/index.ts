@@ -36,3 +36,36 @@ export type AddRestaurantResult = {
   restaurant: Restaurant;
   outcome: AddRestaurantOutcome;
 };
+
+// The caller's one in-flight order (CONTEXT.md §3.12). The restaurant is
+// locked once submitted; total/notes stay editable until placed or cleared.
+export type CurrentSubmission = {
+  restaurantId: number;
+  restaurantName: string;
+  // Free-text description of what was ordered ("items" because ORDER is a
+  // reserved SQL keyword).
+  items: string | null;
+  total: number | null;
+  notes: string | null;
+  submittedAt: string;
+};
+
+// Resolver responses must never be a bare null — the bridge delivers null
+// as an empty object, which the frontend can't distinguish from real data.
+// Wrapping keeps the "no submission" case unambiguous.
+export type CurrentSubmissionResult = {
+  submission: CurrentSubmission | null;
+};
+
+export type SubmitOrderInput = {
+  restaurantId: number;
+  items?: string;
+  total?: number;
+  notes?: string;
+};
+
+export type UpdateSubmissionInput = {
+  items?: string;
+  total?: number;
+  notes?: string;
+};

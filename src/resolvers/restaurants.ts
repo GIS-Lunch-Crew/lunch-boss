@@ -6,6 +6,7 @@ import {
 } from "../validation/restaurantSchemas";
 import * as restaurantService from "../services/restaurantService";
 import { applyMigrations } from "../storage/migrations";
+import { requireAccountId } from "./context";
 import type { AddRestaurantResult, Restaurant } from "../types";
 
 // Resolver layer: thin by design (CONTEXT.md §7). Each handler only
@@ -13,15 +14,6 @@ import type { AddRestaurantResult, Restaurant } from "../types";
 //    the frontend cannot assert who it is),
 // 2. validates req.payload with zod, and
 // 3. delegates to the service.
-
-// context is loosely typed by @forge/resolver; accountId is always present
-// for real invocations, but fail loudly rather than run queries against ''.
-const requireAccountId = (context: { accountId?: unknown }): string => {
-  if (typeof context.accountId !== "string" || context.accountId === "") {
-    throw new Error("Missing accountId in resolver context");
-  }
-  return context.accountId;
-};
 
 export const registerRestaurantResolvers = (resolver: Resolver): void => {
   resolver.define<void, Restaurant[]>(

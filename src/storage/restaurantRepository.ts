@@ -44,6 +44,22 @@ export const findByNormalizedIdentity = async (
   return result.rows[0] ?? null;
 };
 
+export const findById = async (
+  id: number,
+): Promise<RestaurantWithDeletion | null> => {
+  const result = await sql
+    .prepare<RestaurantWithDeletion>(
+      `SELECT ${SELECT_FIELDS}
+       FROM restaurants
+       WHERE id = ?
+       LIMIT 1`,
+    )
+    .bindParams(id)
+    .execute();
+
+  return result.rows[0] ?? null;
+};
+
 export const insert = async (input: {
   name: string;
   phone: string;

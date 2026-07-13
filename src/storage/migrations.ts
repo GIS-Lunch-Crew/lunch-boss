@@ -54,11 +54,21 @@ CREATE TABLE IF NOT EXISTS orders (
   KEY idx_orders_account_ordered (account_id, ordered_at)
 )`;
 
+// v005/v006: free-text description of what was actually ordered. Named
+// "items" because ORDER is a reserved SQL keyword.
+const ADD_ITEMS_TO_SUBMISSION = `
+ALTER TABLE user_current_submission ADD COLUMN items TEXT NULL`;
+
+const ADD_ITEMS_TO_ORDERS = `
+ALTER TABLE orders ADD COLUMN items TEXT NULL`;
+
 const migrations = migrationRunner
   .enqueue('v001_create_restaurants', CREATE_RESTAURANTS)
   .enqueue('v002_create_user_saved_restaurants', CREATE_USER_SAVED_RESTAURANTS)
   .enqueue('v003_create_user_current_submission', CREATE_USER_CURRENT_SUBMISSION)
-  .enqueue('v004_create_orders', CREATE_ORDERS);
+  .enqueue('v004_create_orders', CREATE_ORDERS)
+  .enqueue('v005_add_items_to_user_current_submission', ADD_ITEMS_TO_SUBMISSION)
+  .enqueue('v006_add_items_to_orders', ADD_ITEMS_TO_ORDERS);
 
 export const applyMigrations = async (): Promise<string[]> => {
   const applied = await migrations.run();
