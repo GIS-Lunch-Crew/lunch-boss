@@ -50,3 +50,6 @@ Thumbs.db
 
 
 /.forge/
+
+# Custom UI build output
+static/lunch-boss/build/
