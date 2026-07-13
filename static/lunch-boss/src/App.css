@@ -1,0 +1,143 @@
+.app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.app--loading {
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: var(--color-text-muted);
+}
+
+.app__ticket-slot {
+  height: 140px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app__error {
+  color: var(--color-butter);
+  background: rgba(209, 77, 51, 0.18);
+  border: 1px solid var(--color-tomato);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 0;
+  width: 100%;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.header {
+  text-align: center;
+}
+
+.header__title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 2.6rem;
+  letter-spacing: 0.04em;
+  margin: 0;
+  color: var(--color-mustard);
+  text-shadow: 2px 2px 0 var(--color-tomato);
+}
+
+.header__tagline {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+.restaurant-input {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.restaurant-input__field {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 2px solid var(--color-bg-raised);
+  background: var(--color-bg-raised);
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+.restaurant-input__field:focus {
+  border-color: var(--color-mustard);
+}
+
+.restaurant-input__button {
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: none;
+  background: var(--color-mustard);
+  color: var(--color-bg);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.restaurant-input__button:not(:disabled):hover {
+  background: var(--color-butter);
+}
+
+.restaurant-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  justify-content: center;
+}
+
+.restaurant-list__empty {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.restaurant-list__chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-bg-raised);
+  border: 1px dashed var(--color-text-muted);
+  border-radius: 20px;
+  padding: 6px 8px 6px 14px;
+  font-size: 0.9rem;
+}
+
+.restaurant-list__remove {
+  background: none;
+  border: none;
+  color: var(--color-tomato);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 50%;
+}
+
+.restaurant-list__remove:not(:disabled):hover {
+  background: rgba(209, 77, 51, 0.2);
+}
+
+@media (max-width: 380px) {
+  .header__title {
+    font-size: 2rem;
+  }
+
+  .restaurant-input {
+    flex-direction: column;
+  }
+}
