@@ -3,10 +3,14 @@ import ForgeReconciler, { Text } from '@forge/react';
 import { invoke } from '@forge/bridge';
 
 const App = () => {
-  const [data, setData] = useState(null);
+  const [data, setData] = useState<string | null>(null);
 
   useEffect(() => {
-    invoke('getText', { example: 'my-invoke-variable' }).then(setData);
+    // invoke() may return the value directly or wrapped as { body, metadata },
+    // so unwrap before storing it in state.
+    invoke<string>('getText', { example: 'my-invoke-variable' }).then(
+      (response) => setData(typeof response === 'string' ? response : response.body)
+    );
   }, []);
 
   return (
