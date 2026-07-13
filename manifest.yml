@@ -2,7 +2,6 @@ modules:
   macro:
     - key: lunch-boss-hello-world-macro
       resource: main
-      render: native
       resolver:
         function: resolver
       title: lunch-boss
@@ -11,7 +10,10 @@ modules:
       handler: index.handler
 resources:
   - key: main
-    path: src/frontend/index.jsx
+    path: static/lunch-boss/build
+permissions:
+  scopes:
+    - storage:app
 app:
   runtime:
     name: nodejs24.x
