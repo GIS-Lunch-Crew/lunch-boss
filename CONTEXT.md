@@ -253,6 +253,7 @@ otherwise immutable history table.
 |-----------------|------------------------------------------------------|
 | `account_id`    | **PRIMARY KEY** — enforces one submission per user   |
 | `restaurant_id` | FK → `restaurants.id`, `NOT NULL`, immutable after submit |
+| `items`         | free-text order contents, editable while submitted ("items" because ORDER is a reserved SQL keyword) |
 | `total`         | optional decimal, editable while submitted           |
 | `notes`         | optional, editable while submitted                   |
 | `submitted_at`  | timestamp                                            |
@@ -267,6 +268,7 @@ Row lifecycle: created by `submitOrder`, deleted by `clearSubmission` or by
 | `id`            | PK, auto-increment                          |
 | `account_id`    | who placed it                               |
 | `restaurant_id` | FK → `restaurants.id`                       |
+| `items`         | free-text order contents                    |
 | `ordered_at`    | timestamp                                   |
 | `total`         | optional decimal                            |
 | `notes`         | optional                                    |
