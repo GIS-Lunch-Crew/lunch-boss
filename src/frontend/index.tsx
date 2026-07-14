@@ -7,7 +7,7 @@ import ForgeReconciler, {
   Stack,
   Text,
 } from "@forge/react";
-import { invoke, view } from "@forge/bridge";
+import { invoke, requestConfluence, view } from "@forge/bridge";
 import { describeError, unwrap } from "./lib/invoke";
 import CurrentOrder from "./components/CurrentOrder";
 import type {
@@ -76,6 +76,8 @@ const App = () => {
   const [message, setMessage] = useState<Message | null>(null);
   const [busy, setBusy] = useState(false);
   const [environmentType, setEnvironmentType] = useState<string | null>(null);
+  // Session-only greeting; fetched per page load, never persisted (§3.2).
+  const [displayName, setDisplayName] = useState<string | null>(null);
   // Bumped after a successful add so the (uncontrolled) form fields clear.
   const [formVersion, setFormVersion] = useState(0);
 
@@ -106,6 +108,13 @@ const App = () => {
     view
       .getContext()
       .then((context) => setEnvironmentType(context.environmentType));
+    // Cosmetic — on failure just omit the greeting, no error banner.
+    requestConfluence("/wiki/rest/api/user/current")
+      .then((response) => response.json())
+      .then((user: { displayName?: string }) =>
+        setDisplayName(user.displayName ?? null),
+      )
+      .catch(() => setDisplayName(null));
   }, [refresh, refreshSubmission]);
 
   const refreshOrders = useCallback(async () => {
@@ -324,6 +333,8 @@ const App = () => {
           </Button>
         )}
       </Inline>
+
+      {displayName && <Text>Ordering as {displayName}</Text>}
 
       {message && (
         <SectionMessage appearance={message.appearance}>
