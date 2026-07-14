@@ -1,0 +1,33 @@
+/* Smooth enter/exit so the wheel doesn't pop in and out of the host page. */
+.wheel-app {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+  animation: wheel-app-enter 300ms ease-out;
+  transition:
+    opacity 400ms ease,
+    transform 400ms ease;
+}
+
+.wheel-app--leaving {
+  opacity: 0;
+  transform: scale(0.92);
+}
+
+@keyframes wheel-app-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wheel-app {
+    animation: none;
+    transition: opacity 200ms ease;
+  }
+}
