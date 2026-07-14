@@ -7,7 +7,7 @@ import ForgeReconciler, {
   Stack,
   Text,
 } from "@forge/react";
-import { invoke, requestConfluence, view } from "@forge/bridge";
+import { events, invoke, requestConfluence, view } from "@forge/bridge";
 import { describeError, unwrap } from "./lib/invoke";
 import CurrentOrder from "./components/CurrentOrder";
 import type {
@@ -64,6 +64,8 @@ const App = () => {
   >(undefined);
   const [selected, setSelected] = useState<SelectionTarget | null>(null);
   const [prefill, setPrefill] = useState<OrderPrefill | null>(null);
+  // True while the spin-the-wheel Frame is showing (pool of 2+ only).
+  const [wheelOpen, setWheelOpen] = useState(false);
   // Bumped on every startSelection so CurrentOrder remounts (and its fields
   // reset/prefill) even when the same restaurant is selected again.
   const [selectionVersion, setSelectionVersion] = useState(0);
@@ -192,6 +194,29 @@ const App = () => {
     setSelectionVersion((version) => version + 1);
   };
 
+  // The wheel (Custom UI inside a Frame) reports its winner through the
+  // Events API — the documented Frame↔host communication channel.
+  useEffect(() => {
+    let subscription: { unsubscribe: () => void } | undefined;
+    events
+      .on("lunch-boss.wheel-result", (payload?: SelectionTarget) => {
+        if (
+          payload &&
+          typeof payload.id === "number" &&
+          typeof payload.name === "string"
+        ) {
+          startSelection({ id: payload.id, name: payload.name });
+        }
+        setWheelOpen(false);
+      })
+      .then((sub) => {
+        subscription = sub;
+      });
+    return () => subscription?.unsubscribe();
+    // startSelection only calls stable setters, so subscribing once is safe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const cancelSelection = () => {
     setSelected(null);
     setPrefill(null);
@@ -202,7 +227,13 @@ const App = () => {
     if (pool.length === 0) {
       return;
     }
-    startSelection(pool[Math.floor(Math.random() * pool.length)]);
+    // A one-wedge wheel is silly — instant pick for a pool of one.
+    if (pool.length === 1) {
+      startSelection(pool[0]);
+      return;
+    }
+    setMessage(null);
+    setWheelOpen(true);
   };
 
   const handleReorder = (order: PlacedOrder) =>
@@ -349,6 +380,8 @@ const App = () => {
         prefill={prefill}
         busy={busy}
         poolEmpty={(restaurants ?? []).length === 0}
+        wheelOpen={wheelOpen}
+        onCancelWheel={() => setWheelOpen(false)}
         onPickRandom={pickRandom}
         onCancelSelection={cancelSelection}
         onSubmitOrder={handleSubmitOrder}
