@@ -216,6 +216,19 @@ the database itself via `PRIMARY KEY (account_id)` on the submission table,
 which also resolves the two-devices-submitting-at-once race for free (the
 second insert fails cleanly; frontend shows the existing submission).
 
+**Submit invariant:** submitting an order to a restaurant resurrects it if
+it was soft-deleted and ensures it's in the caller's pool (idempotent save).
+This makes re-orders of deleted restaurants work with zero side effects
+until submit, and gracefully covers the race where a restaurant is deleted
+while someone has it selected. Placed-order history always shows restaurant
+names regardless of deletion (its JOIN ignores `deleted_at`).
+
+**Re-order (frontend-only staging):** a history row's Re-order button stages
+the selection stage with that order's restaurant (`SelectionTarget`:
+id + name) and its items/total/notes (`OrderPrefill`) — no backend call and
+no restaurant lookup happens until submit. Prefill clears on re-pick random
+or cancel. Unavailable while a submission exists.
+
 Rejected alternative: a `status` column on `orders` (`submitted` → `placed`).
 MySQL lacks partial unique indexes, so one-submitted-per-user would need a
 generated-column trick, and it mixes a mutable in-flight record into an
@@ -328,9 +341,9 @@ from `req.context.accountId` — the frontend never sends its own identity.
 
 | key                    | payload                            | behavior |
 |------------------------|------------------------------------|----------|
-| `getCurrentSubmission` | —                                  | Caller's in-flight submission or `null` — page load uses this to decide which UI state to show |
-| `submitOrder`          | `{ restaurantId, total?, notes? }` | Create the caller's submission; rejects if one already exists (PK backstop) |
-| `updateSubmission`     | `{ total?, notes? }`               | Edit submission details; `restaurantId` not accepted (restaurant is locked — clear to re-select) |
+| `getCurrentSubmission` | —                                  | Returns `{ submission: CurrentSubmission \| null }` (wrapped — never bare null, see §7) — page load uses this to decide which UI state to show |
+| `submitOrder`          | `{ restaurantId, items?, total?, notes? }` | Create the caller's submission; rejects if one already exists (PK backstop); resurrects a soft-deleted restaurant + ensures pool membership (§3.12 submit invariant) |
+| `updateSubmission`     | `{ items?, total?, notes? }`       | Edit submission details (overwrite semantics); `restaurantId` not accepted (restaurant is locked — clear to re-select) |
 | `clearSubmission`      | —                                  | Delete the caller's submission; nothing written to history |
 | `placeOrder`           | —                                  | Read caller's submission → insert `orders` row → delete submission |
 | `getOrders`            | `{ from?, to? }`                   | Caller's placed orders, optional date range, newest first |
@@ -371,31 +384,36 @@ Layer rules:
 - Repositories never make decisions (no duplicate checks — they expose
   `findByNormalizedIdentity`, the *service* decides what to do with it).
 
+Engineering rules learned in development:
+- **Cross-entity refresh:** when a backend action has side effects beyond
+  the entity the handler is about, the frontend handler must refetch every
+  affected collection. Current instances: submit → pool (may resurrect or
+  pool-link a restaurant), place → history, delete → pool. Check this
+  explicitly whenever adding a new cross-entity behavior — a missed refetch
+  looks like the action "didn't work" until a page reload.
+- **Never return bare `null` from a resolver.** The bridge delivers it to
+  the frontend as an empty object `{}` (truthy), which is indistinguishable
+  from real data. Wrap nullable responses in an object — see
+  `CurrentSubmissionResult` in `src/types/index.ts`.
+
 ---
 
 ## 8. Roadmap
 
 Each step should leave the app deployable and demonstrable.
 
-1. **TypeScript conversion** — add `typescript` + `tsconfig.json`, rename
-   `.js/.jsx` → `.ts/.tsx`, type the existing hello-world resolver. Verify
-   with `forge lint` + deploy.
-2. **Manifest swap: macro → global page** — replace the `macro` module with
-   `confluence:globalPage`. Module change ⇒ redeploy AND reinstall
-   (`forge install --upgrade`).
-3. **Forge SQL foundation** — add `@forge/sql`, write the initial migration
-   (four tables from §4), wire the migration runner per Forge docs, verify
-   tables provision in the dev environment.
-4. **Shared types + validation foundation** — add `zod`, create `types/` and
-   `validation/` with the entity types and schemas from §4/§6.
-5. **Vertical slice: saved restaurants** — repository → service (identity
-   logic from §3.10) → resolvers → frontend list/add/remove UI. This slice
-   exercises every layer; subsequent features re-run the same recipe.
-6. **Slice: order lifecycle** — frontend random pick + selection state;
-   submission resolvers/service/repo (`submitOrder`, `getCurrentSubmission`,
-   `updateSubmission`, `clearSubmission`, `placeOrder`); submitted-order UI
-   with edit/clear/place per §3.12.
-7. **Slice: order history** — `getOrders` with date filtering; history UI.
+1. ✅ **TypeScript conversion** — done (July 2026).
+2. ✅ **Manifest swap: macro → global page** — done; route `lunch-boss`.
+3. ✅ **Forge SQL foundation** — done; migrations v001–v006 (four tables +
+   `items` columns), hourly scheduled trigger + env-gated dev button.
+4. ✅ **Shared types + validation foundation** — done (`types/`,
+   `validation/`, zod at every resolver boundary).
+5. ✅ **Slice: saved restaurants** — done, plus extras: `updateRestaurant`
+   (edit form), `deleteRestaurant` (global soft delete from edit mode).
+6. ✅ **Slice: order lifecycle** — done per §3.12, plus `items` field and
+   read-only submitted view with explicit Edit mode.
+7. ✅ **Slice: order history** — done, plus From/To/Today filters and
+   Re-order staging.
 8. **Polish** — current-user display name (add `read:confluence-user` scope
    ⇒ redeploy + reinstall), error/empty states, `npm run lint` clean.
 
@@ -409,7 +427,64 @@ Each step should leave the app deployable and demonstrable.
 
 ---
 
-## 9. Workflow Reminders (from AGENTS.md, kept here for convenience)
+## 9. Team Development Workflow
+
+Decided July 2026, kept deliberately simple while the team is small; revisit
+at Marketplace prep (see "Consolidation" below).
+
+**Current model — one app per developer:**
+- Each dev registers their own Forge app. The **canonical/team app ID** is
+  what lives in the committed `manifest.yml`; each dev swaps in their own ID
+  locally and hides the diff with
+  `git update-index --skip-worktree manifest.yml`. Personal IDs are noted in
+  the gitignored `.env` — documentation only, nothing reads that file.
+- **Committing manifest changes** (the only time the dance matters):
+  `--no-skip-worktree` → set the canonical ID back → commit/PR → restore
+  your ID → re-apply skip-worktree. Forgetting the last step means your next
+  deploy lands on the team app instead of yours.
+- **Merging deploys nothing.** GitHub and Forge are disconnected; code
+  reaches an app only when someone with deploy rights runs `forge deploy`
+  against that app ID. After a merge (or, at this early stage, acceptably
+  before), someone deploys the canonical app and runs
+  `forge install --upgrade` on the team site, then runs migrations.
+
+**Key platform facts driving the workflow:**
+- Environments live in Atlassian's cloud, not on any machine. A deployed +
+  installed environment is usable by every user of that site in the browser.
+- Forge SQL is scoped **per installation** (app + environment + site):
+  separate apps or environments = separate databases. Shared test data only
+  happens inside one installed environment.
+- `forge tunnel` serves local *code*, but manifest-level state (modules,
+  scopes) and applied migrations are server-side environment state — after a
+  manifest change the environment needs a deploy + upgrade before tunnelling.
+
+**Reviewing a teammate's PR — three modes for three purposes:**
+1. *Does it work / UX check:* no commands. Open the team site in the browser
+   and use the author's installed environment — you see their deployed code
+   AND their database state.
+2. *Is the code right:* the GitHub diff. No Forge involvement.
+3. *Runtime debugging:* pull the branch and deploy it to **your own**
+   environment (+ `install --upgrade` if the manifest changed, + run
+   migrations). Your own WIP is safe in your branch — environments are
+   disposable deploy targets, not workspaces. Convention: **never deploy to
+   an environment/app named after someone else.**
+
+**Convention:** each dev installs their dev environment/app on the team
+space so teammates can browser-test PRs (mode 1) without pulling anything.
+
+**Versioning:** Forge assigns app versions server-side at deploy (module and
+scope changes auto-bump the major version); see the developer console.
+`package.json`'s name/version are template leftovers Forge never reads.
+
+**Consolidation (before Marketplace):** the listing points at a single app
+ID, so the team consolidates then: one app, teammates added as collaborators
+in the developer console, each dev deploying to their own custom environment
+(`forge deploy -e <name>`). That deletes the skip-worktree dance and the
+ID-swapping entirely. Do it as its own deliberate migration, not mid-feature.
+
+---
+
+## 10. Workflow Reminders (from AGENTS.md, kept here for convenience)
 
 - `forge lint` after any manifest change; `forge deploy --non-interactive -e development`.
 - Manifest module/scope changes require redeploy **and** reinstall
