@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   Button,
+  Frame,
   Heading,
   Inline,
   Label,
@@ -35,6 +36,10 @@ type Props = {
   prefill: OrderPrefill | null;
   busy: boolean;
   poolEmpty: boolean;
+  // True while the spin-the-wheel Frame is showing; the wheel iframe emits
+  // the winner back to the host via the Events API.
+  wheelOpen: boolean;
+  onCancelWheel: () => void;
   onPickRandom: () => void;
   onCancelSelection: () => void;
   onSubmitOrder: (
@@ -59,6 +64,8 @@ const CurrentOrder = ({
   prefill,
   busy,
   poolEmpty,
+  wheelOpen,
+  onCancelWheel,
   onPickRandom,
   onCancelSelection,
   onSubmitOrder,
@@ -87,6 +94,23 @@ const CurrentOrder = ({
       <Stack space="space.100">
         <Heading as="h2">Current order</Heading>
         <Spinner label="Loading your order" />
+      </Stack>
+    );
+  }
+
+  // The wheel takes over the panel while open (also covers re-picks from
+  // the selection stage); its result lands via the host's event listener.
+  if (!submission && wheelOpen) {
+    return (
+      <Stack space="space.100">
+        <Heading as="h2">Current order</Heading>
+        <Text>Spin the wheel — fate picks where you're eating.</Text>
+        <Frame resource="wheel" />
+        <Inline>
+          <Button appearance="subtle" isDisabled={busy} onClick={onCancelWheel}>
+            Cancel
+          </Button>
+        </Inline>
       </Stack>
     );
   }
