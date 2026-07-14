@@ -49,6 +49,17 @@ These come from the Forge platform and will break the app if violated:
 - **Frontend must use UI Kit components from `@forge/react` only.** No raw
   HTML elements, no third-party React component libraries. (Full component
   list in `AGENTS.md`.)
+- **Two frontend models exist: UI Kit and Custom UI.** UI Kit
+  (`render: native`) is what this app uses — Atlassian renders it natively,
+  but free-form HTML/CSS/animation is impossible. **Custom UI** is the
+  sanctioned alternative: any static frontend (e.g. React + Vite) compiled
+  to plain files, served by Atlassian in a sandboxed iframe (strict CSP, no
+  external resources). No server runs anywhere: `vite build` is a compiler;
+  `forge deploy` uploads its output. UI Kit's `Frame` component embeds a
+  Custom UI resource *inside* a UI Kit app; host↔iframe communication goes
+  through the `@forge/bridge` **Events API** (documented in Frame's own
+  typings). Gotcha: Custom UI vite configs MUST set `base: "./"` — Forge
+  serves iframes from non-root paths, so absolute asset URLs 404.
 - **Forge storage (SQL, KV, custom entities) has NO client-side API.** Every
   read/write goes through a backend resolver. This is why this app is
   resolver-heavy despite `AGENTS.md` suggesting frontend-direct API calls
@@ -234,6 +245,37 @@ MySQL lacks partial unique indexes, so one-submitted-per-user would need a
 generated-column trick, and it mixes a mutable in-flight record into an
 otherwise immutable history table.
 
+### 3.13 Random-pick UX: Hector's wheel embedded via `Frame`
+
+The instant `Math.random` pick was upgraded (branch `spinner-animation`) to
+a spinning wheel lifted from `hector/single-user-lunch-picker`:
+
+- **Keep UI Kit; embed, don't convert.** The wheel is Custom UI (SVG wheel +
+  4s CSS transition — unbuildable in UI Kit), mounted via
+  `<Frame resource="wheel" />` only while picking. Converting the whole app
+  to Custom UI was rejected as disproportionate for one animated widget —
+  revisit only if the app becomes animation-heavy.
+- **Vendored as content copies, NOT cherry-picks.** Hector's commits bundle
+  his entire (incompatible, §9.7) app, so file contents were copied via
+  `git show <branch>:<path>` into `static/wheel/`. No git history or
+  authorship carried over — credit belongs in a
+  `Co-authored-by: <name> <github-email>` commit trailer, and the copies
+  will NOT track his later changes.
+- **Adaptations made:** wedges keyed by `{id, name}` objects instead of name
+  strings (our names aren't unique — identity is the triple, §3.10) and the
+  winner is reported as the object; iframe body made transparent (his app's
+  dark page background would clash inside our host page); enter/exit
+  fade/scale added in the iframe's own CSS (the UI Kit side cannot animate).
+  His SPIN-hub interaction kept deliberately — no auto-spin.
+- **Pool rules:** the wheel opens for pools of 2+; a pool of exactly 1 keeps
+  the instant pick (a one-wedge wheel is silly); the hub itself also refuses
+  to spin below 2 ("Add 2+").
+- **Result handoff:** the wheel emits `lunch-boss.wheel-result` with the
+  winning `{id, name}` via `events.emit`; the host subscribed with
+  `events.on` validates the payload, feeds the existing `startSelection`,
+  and closes the Frame. The Cancel button lives host-side below the Frame,
+  so the wheel component needed no changes for cancellation.
+
 ---
 
 ## 4. Data Model
@@ -316,9 +358,12 @@ Forge SQL (per-installation MySQL)
   Once submitted, the in-flight order lives in `user_current_submission`
   server-side (survives reloads, visible from any device) until cleared or
   placed.
-- "Pick random restaurant" operates on the already-fetched saved list in the
-  frontend (`Math.random`) — no resolver needed. Revisit if pick logic grows
-  (weighting, history-aware).
+- "Pick random restaurant" (§3.13): pool of exactly 1 → instant pick in the
+  host. Pool of 2+ → the wheel Frame opens; the iframe fetches the pool
+  itself via `invoke("getSavedRestaurants")` (same app, same resolvers),
+  spins (winner chosen by the same `Math.random`, inside the wheel), and
+  emits the result back over the Events API. Both paths end in
+  `startSelection` — the rest of the lifecycle is identical.
 
 ---
 
@@ -384,6 +429,27 @@ Layer rules:
 - Repositories never make decisions (no duplicate checks — they expose
   `findByNormalizedIdentity`, the *service* decides what to do with it).
 
+```
+static/
+  wheel/                      # Custom UI resource: the wheel (§3.13)
+    package.json              # own package: react, react-dom, @forge/bridge,
+                              #   vite (+ plugin) — installed separately
+    vite.config.js            # base: "./" (REQUIRED, see §2), outDir: build
+    index.html
+    src/
+      main.jsx
+      WheelApp.jsx            # shell: fetch pool → Wheel → emit result
+      components/Wheel.jsx    # adapted from Hector's branch ({id, name})
+      utils/wheelMath.js      # verbatim from Hector's branch
+      utils/colors.js         # verbatim
+      styles/                 # Wheel.css verbatim; global.css adapted
+                              #   (transparent body); app.css new (enter/exit)
+      assets/fonts/           # Anton-Regular.woff2 (hub typeface)
+    build/                    # GITIGNORED vite output — the manifest's
+                              #   `wheel` resource points here; must be built
+                              #   before forge lint / deploy (§9.3)
+```
+
 Engineering rules learned in development:
 - **Cross-entity refresh:** when a backend action has side effects beyond
   the entity the handler is about, the frontend handler must refetch every
@@ -414,8 +480,11 @@ Each step should leave the app deployable and demonstrable.
    read-only submitted view with explicit Edit mode.
 7. ✅ **Slice: order history** — done, plus From/To/Today filters and
    Re-order staging.
-8. **Polish** — current-user display name (add `read:confluence-user` scope
-   ⇒ redeploy + reinstall), error/empty states, `npm run lint` clean.
+8. **Polish** — ✅ current-user display name (`read:confluence-user` scope);
+   remaining: error/empty states pass, `npm run lint` clean.
+9. ✅ **Wheel random-pick UX** (branch `spinner-animation`) — Hector's wheel
+   vendored as a Custom UI resource embedded via `Frame` (§3.13); re-order
+   and Today filter shipped on the same branch line.
 
 ### Deferred / future
 
@@ -429,58 +498,184 @@ Each step should leave the app deployable and demonstrable.
 
 ## 9. Team Development Workflow
 
-Decided July 2026, kept deliberately simple while the team is small; revisit
-at Marketplace prep (see "Consolidation" below).
+The operating handbook for this repo (July 2026). Current model: **one Forge
+app per developer**, kept deliberately simple while the team is small;
+consolidation happens at Marketplace prep (§9.8).
 
-**Current model — one app per developer:**
-- Each dev registers their own Forge app. The **canonical/team app ID** is
-  what lives in the committed `manifest.yml`; each dev swaps in their own ID
-  locally and hides the diff with
-  `git update-index --skip-worktree manifest.yml`. Personal IDs are noted in
-  the gitignored `.env` — documentation only, nothing reads that file.
-- **Committing manifest changes** (the only time the dance matters):
-  `--no-skip-worktree` → set the canonical ID back → commit/PR → restore
-  your ID → re-apply skip-worktree. Forgetting the last step means your next
-  deploy lands on the team app instead of yours.
-- **Merging deploys nothing.** GitHub and Forge are disconnected; code
-  reaches an app only when someone with deploy rights runs `forge deploy`
-  against that app ID. After a merge (or, at this early stage, acceptably
-  before), someone deploys the canonical app and runs
-  `forge install --upgrade` on the team site, then runs migrations.
+### 9.1 Who owns what, and the facts that drive everything
 
-**Key platform facts driving the workflow:**
-- Environments live in Atlassian's cloud, not on any machine. A deployed +
-  installed environment is usable by every user of that site in the browser.
-- Forge SQL is scoped **per installation** (app + environment + site):
-  separate apps or environments = separate databases. Shared test data only
-  happens inside one installed environment.
-- `forge tunnel` serves local *code*, but manifest-level state (modules,
-  scopes) and applied migrations are server-side environment state — after a
-  manifest change the environment needs a deploy + upgrade before tunnelling.
+| App | ID suffix | Registered by | Installed on | Role |
+|---|---|---|---|---|
+| Kyle's dev app | `b6facef4…` | Kyle | `anjomi.atlassian.net` (development) | Kyle's day-to-day deploys/tunnels |
+| Team / "canonical" app | `e7efcf7b…` | **Hector** | `gis-team-one.atlassian.net` | The ID committed in `manifest.yml`; browser-testing PRs. ⚠ See §9.7 |
 
-**Reviewing a teammate's PR — three modes for three purposes:**
-1. *Does it work / UX check:* no commands. Open the team site in the browser
-   and use the author's installed environment — you see their deployed code
-   AND their database state.
-2. *Is the code right:* the GitHub diff. No Forge involvement.
-3. *Runtime debugging:* pull the branch and deploy it to **your own**
-   environment (+ `install --upgrade` if the manifest changed, + run
-   migrations). Your own WIP is safe in your branch — environments are
-   disposable deploy targets, not workspaces. Convention: **never deploy to
-   an environment/app named after someone else.**
+Platform facts everything below follows from:
 
-**Convention:** each dev installs their dev environment/app on the team
-space so teammates can browser-test PRs (mode 1) without pulling anything.
+- **An app is the unit of deploy rights AND of data.** Only its owner (or
+  developer-console collaborators) can deploy to it.
+- **Environments live in Atlassian's cloud, not on machines.** A deployed +
+  installed environment is a real running app for every user of that site,
+  in the browser, with the developer's laptop off. The git branch and the
+  deployed environment are separate artifacts kept in sync only by
+  deploying.
+- **Forge SQL is scoped per installation** (app + environment + site).
+  Different apps or environments on the same site = completely separate
+  databases. Shared test data exists only inside one installed environment.
+- **Merging a PR deploys nothing.** GitHub and Forge are disconnected; code
+  reaches an app only when someone with rights runs `forge deploy`.
+- **`forge tunnel` serves local code only.** Modules, scopes, and applied
+  migrations are server-side environment state — after any manifest change,
+  the environment needs `forge deploy` (+ `install --upgrade`) before
+  tunnelling is meaningful again.
 
-**Versioning:** Forge assigns app versions server-side at deploy (module and
-scope changes auto-bump the major version); see the developer console.
+### 9.2 The manifest dance (app-ID swapping)
+
+The committed manifest always carries the **canonical** app ID. Each dev's
+personal ID exists only in their working tree, hidden from git via
+skip-worktree. Both IDs are recorded in the gitignored `.env` —
+**documentation only; nothing reads that file.**
+
+Check current state (capital `S` = skipped): `git ls-files -v | grep '^S'`
+
+Committing a manifest change:
+
+```
+git update-index --no-skip-worktree manifest.yml
+# edit app.id → canonical ID (from .env)
+git add manifest.yml <other files> && git commit && git push
+# edit app.id → your personal ID (from .env)
+git update-index --skip-worktree manifest.yml
+```
+
+**Forgetting the re-skip/re-swap means your next deploy lands on the TEAM
+app** — this is the most consequential mistake available in this workflow.
+
+Branch-switch gotcha: if a checkout needs to rewrite `manifest.yml` (the
+branches differ on it), the skip-worktree flag causes a refusal ("local
+changes would be overwritten") or, on older gits, a silent clobber.
+Recovery: un-skip → switch → re-set personal ID → re-skip. The `.env` record
+makes any clobber a ten-second fix. Untracked files (`.env`) and the
+skip-worktree flag itself both survive branch switches on their own.
+
+### 9.3 Deploying and testing
+
+Personal loop (manifest holds YOUR id — verify first, §9.2):
+
+```
+forge deploy --non-interactive -e development
+forge install [--upgrade] --non-interactive --site <your-site> \
+  --product confluence --environment development
+forge tunnel
+```
+
+- `install` only on first install; `--upgrade` required whenever modules or
+  scopes changed (the site re-consents). Code-only changes hot-reload
+  through the tunnel with no redeploy.
+- Migrations: the hourly scheduled trigger applies them automatically, or
+  click the env-gated "Run migrations (dev)" button for instant. A fresh
+  install shows a missing-table error on first load until migrations run.
+- **Wheel build prerequisite** (since `spinner-animation`):
+  `static/wheel/build/` is gitignored, so on a fresh clone run
+  `npm --prefix static/wheel install` once, then `npm run build:wheel`,
+  BEFORE `forge lint`/`forge deploy` — both fail on the missing resource
+  folder otherwise. Rebuild after changing wheel source.
+
+Team site: same commands with the canonical ID in the manifest and
+`--site gis-team-one.atlassian.net`. Only someone with deploy rights to the
+canonical app can run these (§9.1). **During PR review, redeploy after every
+push** — the installed page keeps serving the old build otherwise and
+"check it on the page" silently becomes a lie.
+
+### 9.4 Reviewing a PR — three modes for three purposes
+
+1. **Does it work / UX check — zero commands.** Open the team site in the
+   browser → Apps → the author's installed app. You are using their deployed
+   code AND their database (data belongs to the installation, so you see
+   exactly the state they produced). PR descriptions should include a
+   click-path test script so this mode covers every layer.
+2. **Is the code right** — the GitHub diff. No Forge involvement.
+3. **Runtime debugging** — pull the branch and deploy it to **your own**
+   app/environment (+ `install --upgrade` if the manifest changed, + run
+   migrations), then tunnel. Your own WIP is never at risk: it lives in your
+   branch, and environments are disposable deploy targets — redeploy your
+   branch afterward and you're back. Convention: **never deploy to an app or
+   environment that isn't yours.**
+
+### 9.5 Taking code from a teammate's branch
+
+Do NOT check out their branch to take code (it replaces your working tree
+and trips the §9.2 manifest clobber). Read it from where you stand:
+
+```
+git fetch origin
+git ls-tree -r --name-only origin/<branch>        # what exists
+git show origin/<branch>:path/to/file             # read any single file
+git diff origin/main...origin/<branch> [-- path]  # their full diff
+```
+
+Then pick the transfer method by granularity:
+
+- **Whole commits:** `git cherry-pick <sha>` — preserves their authorship,
+  but drags in *everything* those commits touched.
+- **Whole files:** `git restore --source=origin/<branch> --staged
+  --worktree -- <path>`.
+- **Hunks within files:** `git checkout -p origin/<branch> -- <path>`.
+- **Vendoring/adapting (what the wheel did, §3.13):**
+  `git show origin/<branch>:<path> > <newpath>` copies **contents only** —
+  no history, no authorship; you become the author on commit. Credit with a
+  `Co-authored-by: Name <github-email>` trailer (must be their GitHub email
+  for the link to resolve). Copies do NOT track the source branch's later
+  changes — any future sync is another manual diff.
+
+### 9.6 Stacked branches and PR overlap
+
+A branch cut from an unmerged branch (e.g. `spinner-animation` off
+`backend-setup`) shows "overlap" — the parent's commits appearing in its
+PR — only when ALL THREE hold: (1) cut from an unmerged parent, (2) PR
+opened with base = `main`, (3) parent not yet merged. GitHub's PR diff is
+"commits reachable from your branch but not from the base." Remove any
+ingredient: wait for the parent to merge (the do-nothing fix — GitHub
+recomputes and open-PR overlap evaporates), or open the PR with **base =
+the parent branch** and retarget to `main` after the parent merges. This is
+purely a review-display artifact — it never creates duplicate commits or
+conflicts. Commits on the child branch never appear in the parent's PR
+(PRs track branches; diverged commits aren't reachable from the parent).
+
+### 9.7 ⚠ OPEN ISSUE — shared app ID, incompatible architectures
+
+The "canonical" ID (`e7efcf7b…`) is **Hector's registered app**, and his
+branch (`hector/single-user-lunch-picker`) is a **competing implementation**
+of lunch-boss: `macro` module + full-page Custom UI + KV storage
+(`storage:app` scope), versus this branch's global page + UI Kit + Forge
+SQL. Until the team picks one architecture for `main`:
+
+- Deploys to that app ID **silently overwrite each other** — Kyle's team-site
+  deploy replaced whatever Hector had there, and vice versa.
+- The two branches' PRs conflict at the architecture level, not just in
+  `manifest.yml` — they cannot both merge.
+- The wheel vendoring (§3.13) deliberately carries the standout piece of
+  Hector's UI into this branch's architecture.
+
+Requires a team decision; record the outcome here when made.
+
+### 9.8 Consolidation plan (before Marketplace, at the latest)
+
+A Marketplace listing points at **one** app ID, so consolidation is forced
+eventually: one app, teammates added as **collaborators** in the developer
+console, each dev deploying to their own **custom environment**
+(`forge deploy -e kyle`, `forge install -e kyle --site …`). Each environment
+keeps its own isolated database; the manifest carries the one true ID
+permanently, which deletes the §9.2 dance entirely. Do it as a deliberate
+standalone migration, not mid-feature. (Verify the collaborator setup in the
+developer console before committing — it's tied to how the app was
+registered.)
+
+### 9.9 Versioning
+
+Forge assigns app versions server-side at deploy (module/scope changes
+auto-bump the major version); see the deploy output or developer console.
+There is no version constant in the manifest or code to maintain —
 `package.json`'s name/version are template leftovers Forge never reads.
-
-**Consolidation (before Marketplace):** the listing points at a single app
-ID, so the team consolidates then: one app, teammates added as collaborators
-in the developer console, each dev deploying to their own custom environment
-(`forge deploy -e <name>`). That deletes the skip-worktree dance and the
-ID-swapping entirely. Do it as its own deliberate migration, not mid-feature.
 
 ---
 
