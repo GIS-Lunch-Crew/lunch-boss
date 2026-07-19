@@ -1,20 +1,33 @@
 modules:
-  macro:
-    - key: lunch-boss-hello-world-macro
+  confluence:globalPage:
+    - key: lunch-boss-page
       resource: main
       render: native
       resolver:
         function: resolver
-      title: lunch-boss
+      title: Lunch Boss
+      route: lunch-boss
   function:
     - key: resolver
       handler: index.handler
+    - key: migration
+      handler: index.migrationHandler
+  sql:
+    - key: main
+      engine: mysql
+  scheduledTrigger:
+    - key: run-migrations
+      function: migration
+      interval: hour
 resources:
   - key: main
-    path: src/frontend/index.jsx
+    path: src/frontend/index.tsx
 app:
   runtime:
     name: nodejs24.x
     memoryMB: 256
     architecture: arm64
   id: ari:cloud:ecosystem::app/e7efcf7b-5295-404d-9d0d-e196f590c88b
+permissions:
+  scopes:
+    - read:confluence-user
