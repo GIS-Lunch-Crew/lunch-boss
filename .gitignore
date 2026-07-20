@@ -51,5 +51,7 @@ Thumbs.db
 
 /.forge/
 manifest.original.yml
-package-lock.json
 .env
+
+# Vite build output for the wheel Custom UI resource (built at deploy time)
+static/wheel/build/

@@ -22,6 +22,8 @@ modules:
 resources:
   - key: main
     path: src/frontend/index.tsx
+  - key: wheel
+    path: static/wheel/build
 app:
   runtime:
     name: nodejs24.x
