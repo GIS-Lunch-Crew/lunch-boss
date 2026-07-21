@@ -405,6 +405,7 @@ const App = () => {
         restaurants={restaurants}
         busy={busy}
         selectionDisabled={submission != null}
+        selectedRestaurantId={selected?.id ?? submission?.restaurantId ?? null}
         onSelect={startSelection}
         onEdit={(restaurant) => {
           setMessage(null);
