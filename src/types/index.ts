@@ -86,3 +86,15 @@ export type GetOrdersInput = {
   from?: string;
   to?: string;
 };
+
+// Lightweight aggregate stats for the Home tab — computed in SQL so the
+// frontend never has to fetch full order history just to show counts.
+export type OrderStats = {
+  totalRestaurants: number;
+  totalOrders: number;
+  topRestaurant: {
+    restaurantId: number;
+    restaurantName: string;
+    count: number;
+  } | null;
+};

@@ -1,8 +1,6 @@
 import React, { useState } from "react";
 import {
   Button,
-  Frame,
-  Heading,
   Inline,
   Label,
   Spinner,
@@ -12,6 +10,7 @@ import {
   TextArea,
   Textfield,
 } from "@forge/react";
+import WheelModal from "./WheelModal";
 import type { CurrentSubmission } from "../../types";
 
 // All the selection stage needs to render — a full Restaurant satisfies it,
@@ -73,9 +72,7 @@ const CurrentOrder = ({
   onClearSubmission,
   onPlaceOrder,
 }: Props) => {
-  const [items, setItems] = useState(
-    submission?.items ?? prefill?.items ?? "",
-  );
+  const [items, setItems] = useState(submission?.items ?? prefill?.items ?? "");
   const [total, setTotal] = useState(
     submission?.total != null
       ? String(submission.total)
@@ -83,63 +80,45 @@ const CurrentOrder = ({
         ? String(prefill.total)
         : "",
   );
-  const [notes, setNotes] = useState(
-    submission?.notes ?? prefill?.notes ?? "",
-  );
+  const [notes, setNotes] = useState(submission?.notes ?? prefill?.notes ?? "");
   // Submitted orders are read-only until the user explicitly edits them.
   const [editingDetails, setEditingDetails] = useState(false);
 
   if (submission === undefined) {
-    return (
-      <Stack space="space.100">
-        <Heading as="h2">Current order</Heading>
-        <Spinner label="Loading your order" />
-      </Stack>
-    );
+    return <Spinner label="Loading your order" />;
   }
 
-  // The wheel takes over the panel while open (also covers re-picks from
-  // the selection stage); its result lands via the host's event listener.
-  if (!submission && wheelOpen) {
-    return (
-      <Stack space="space.100">
-        <Heading as="h2">Current order</Heading>
-        <Text>Spin the wheel — fate picks where you're eating.</Text>
-        <Frame resource="wheel" />
-        <Inline>
-          <Button appearance="subtle" isDisabled={busy} onClick={onCancelWheel}>
-            Cancel
-          </Button>
-        </Inline>
-      </Stack>
-    );
-  }
+  // The wheel is a Modal overlay now (WheelModal), so it can be rendered as
+  // a plain sibling — it no longer needs to hijack the panel to avoid
+  // layout shift, and it's reachable from both the no-selection and
+  // selecting stages (re-pick).
+  const wheelModal = (
+    <WheelModal isOpen={wheelOpen} busy={busy} onCancel={onCancelWheel} />
+  );
 
   if (submission == null) {
     if (!selected) {
       return (
-        <Stack space="space.100">
-          <Heading as="h2">Current order</Heading>
+        <Stack grow="fill" space="space.100">
           <Text>
-            No order in progress — select a restaurant from your pool below,
-            or let fate decide.
+            No order in progress — select a restaurant from your pool below, or
+            let fate decide.
           </Text>
           <Inline>
             <Button isDisabled={busy || poolEmpty} onClick={onPickRandom}>
               Pick a random restaurant
             </Button>
           </Inline>
+          {wheelModal}
         </Stack>
       );
     }
 
     // Selecting stage: fields seed the submission.
     return (
-      <Stack space="space.100">
-        <Heading as="h2">Current order</Heading>
+      <Stack grow="fill" space="space.100">
         <Text>
-          Ordering from <Strong>{selected.name}</Strong>. Submit to lock it
-          in.
+          Ordering from <Strong>{selected.name}</Strong>. Submit to lock it in.
         </Text>
         <Label labelFor="orderItems">Order</Label>
         <TextArea
@@ -178,14 +157,14 @@ const CurrentOrder = ({
             Cancel
           </Button>
         </Inline>
+        {wheelModal}
       </Stack>
     );
   }
 
   if (!editingDetails) {
     return (
-      <Stack space="space.100">
-        <Heading as="h2">Current order</Heading>
+      <Stack grow="fill" space="space.100">
         <Text>
           Submitted for <Strong>{submission.restaurantName}</Strong>. The
           restaurant is locked — clear the order to choose a different one.
@@ -216,8 +195,7 @@ const CurrentOrder = ({
   }
 
   return (
-    <Stack space="space.100">
-      <Heading as="h2">Current order</Heading>
+    <Stack grow="fill" space="space.100">
       <Text>
         Editing order for <Strong>{submission.restaurantName}</Strong>. The
         restaurant stays locked — clear the order to choose a different one.
