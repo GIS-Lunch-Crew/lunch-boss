@@ -3,7 +3,6 @@ import {
   Button,
   DatePicker,
   DynamicTable,
-  Heading,
   Inline,
   Label,
   Spinner,
@@ -88,9 +87,7 @@ const OrderHistory = ({
   }));
 
   return (
-    <Stack space="space.100">
-      <Heading as="h2">Order history</Heading>
-      {/* --- Date filter controls --- */}
+    <Stack grow="fill" space="space.100">
       <Inline space="space.200" alignBlock="end">
         <Stack space="space.050">
           <Label labelFor="historyFrom">From</Label>

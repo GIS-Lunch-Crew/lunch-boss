@@ -2,6 +2,17 @@ import { sql } from "@forge/sql";
 import type { UpdateQueryResponse } from "@forge/sql";
 import type { PlacedOrder } from "../types";
 
+type TopRestaurantRow = {
+  restaurantId: number;
+  restaurantName: string;
+  count: number;
+};
+
+export type OrderStatsRow = {
+  totalOrders: number;
+  topRestaurant: TopRestaurantRow | null;
+};
+
 // Repository for orders — immutable placed-order history (CONTEXT.md §3.12).
 
 type OrderRow = Omit<PlacedOrder, "total"> & { total: string | number | null };
@@ -46,6 +57,46 @@ export const listByAccount = async (
     ...row,
     total: row.total === null ? null : Number(row.total),
   }));
+};
+
+// Home-tab aggregate stats: total orders placed, plus the most-ordered
+// restaurant (ties broken by whichever MySQL returns first).
+export const getStats = async (accountId: string): Promise<OrderStatsRow> => {
+  const totalResult = await sql
+    .prepare<{ totalOrders: number }>(
+      `SELECT COUNT(*) AS totalOrders FROM orders WHERE account_id = ?`,
+    )
+    .bindParams(accountId)
+    .execute();
+  const totalOrders = Number(totalResult.rows[0]?.totalOrders ?? 0);
+
+  const topResult = await sql
+    .prepare<TopRestaurantRow>(
+      `SELECT
+         o.restaurant_id AS restaurantId,
+         r.name AS restaurantName,
+         COUNT(*) AS count
+       FROM orders o
+       JOIN restaurants r ON r.id = o.restaurant_id
+       WHERE o.account_id = ?
+       GROUP BY o.restaurant_id, r.name
+       ORDER BY count DESC
+       LIMIT 1`,
+    )
+    .bindParams(accountId)
+    .execute();
+  const topRow = topResult.rows[0];
+
+  return {
+    totalOrders,
+    topRestaurant: topRow
+      ? {
+          restaurantId: topRow.restaurantId,
+          restaurantName: topRow.restaurantName,
+          count: Number(topRow.count),
+        }
+      : null,
+  };
 };
 
 export const insert = async (

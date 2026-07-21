@@ -251,10 +251,19 @@ The instant `Math.random` pick was upgraded (branch `spinner-animation`) to
 a spinning wheel lifted from `hector/single-user-lunch-picker`:
 
 - **Keep UI Kit; embed, don't convert.** The wheel is Custom UI (SVG wheel +
-  4s CSS transition — unbuildable in UI Kit), mounted via
-  `<Frame resource="wheel" />` only while picking. Converting the whole app
+  4s CSS transition — unbuildable in UI Kit). Converting the whole app
   to Custom UI was rejected as disproportionate for one animated widget —
   revisit only if the app becomes animation-heavy.
+- **Frame lives in a Modal, not inline (§3.14 update).** `<Frame
+  resource="wheel" />` is rendered inside `WheelModal.tsx`
+  (`Modal`/`ModalTransition` from UI Kit), not embedded directly in
+  `CurrentOrder`'s render tree. The inline embed originally caused a
+  layout-shift bug — opening/closing the wheel shifted every section below
+  it. The Modal overlay fixes that: it renders in its own layer, so the page
+  behind it never shifts, and Modal's default dismiss behavior (backdrop
+  click, Esc) is wired to the same cancel handler as the Cancel button —
+  clicking outside mid-spin closes the Frame before the wheel's `events.emit`
+  result ever fires, so no restaurant gets picked.
 - **Vendored as content copies, NOT cherry-picks.** Hector's commits bundle
   his entire (incompatible, §9.7) app, so file contents were copied via
   `git show <branch>:<path>` into `static/wheel/`. No git history or
@@ -273,8 +282,37 @@ a spinning wheel lifted from `hector/single-user-lunch-picker`:
 - **Result handoff:** the wheel emits `lunch-boss.wheel-result` with the
   winning `{id, name}` via `events.emit`; the host subscribed with
   `events.on` validates the payload, feeds the existing `startSelection`,
-  and closes the Frame. The Cancel button lives host-side below the Frame,
+  and closes the Modal. The Cancel button lives host-side in `ModalFooter`,
   so the wheel component needed no changes for cancellation.
+
+### 3.14 Layout redesign: tabs and modals
+
+The single always-visible `<Stack>` of sections was restructured for
+intuitiveness:
+
+- **Sections were briefly collapsible** (`CollapsibleSection.tsx`, built on
+  `Pressable` + a chevron `Icon` glyph swap, since UI Kit has no
+  Accordion/Expander or animation capability), but that was removed once the
+  tab split (below) already solved the single-column clutter problem it was
+  meant to address — sections are now static, each with a plain `Heading`.
+- **Three top-level tabs** (`Tabs`/`TabList`/`TabPanel`, natively supported
+  in UI Kit): Home (Current order + Stats), Restaurants (pool + Add/Edit
+  modal), History (order history). Not persisted — always resets to Home on
+  load.
+- **Add/Edit Restaurant is a Modal** (`RestaurantFormModal.tsx` wrapping
+  `RestaurantForm.tsx`), triggered by an "Add restaurant" button below the
+  pool table (or a row's Edit action). Unlike the wheel modal, this one must
+  NOT close on backdrop-click/Esc — only an explicit X (in a custom
+  `ModalHeader`) or Cancel button. The mechanism: simply don't pass `onClose`
+  to `<Modal>` — since Modal's open state is entirely external (controlled
+  by conditionally rendering it inside `ModalTransition`), omitting the
+  callback means backdrop-click/Esc have nothing to call.
+- **Responsive form grouping:** `RestaurantForm`'s fields are grouped into
+  `Inline shouldWrap` rows, each field wrapped in `Box xcss={{ flexGrow: 1,
+  minWidth: ... }}`. Note: Box's XCSS `minWidth`/`width` are
+  token-restricted (`size.100`…`size.1000`, `100%`) despite general XCSS
+  docs suggesting arbitrary CSS lengths — `size.1000` (12rem/192px) is the
+  practical max for a two-column field row.
 
 ---
 
@@ -392,6 +430,7 @@ from `req.context.accountId` — the frontend never sends its own identity.
 | `clearSubmission`      | —                                  | Delete the caller's submission; nothing written to history |
 | `placeOrder`           | —                                  | Read caller's submission → insert `orders` row → delete submission |
 | `getOrders`            | `{ from?, to? }`                   | Caller's placed orders, optional date range, newest first |
+| `getOrderStats`        | —                                   | Aggregate counts for the Home tab (§3.14): total pool size, total orders placed, most-ordered restaurant. Computed in SQL rather than reusing `getOrders`, so a History-tab date filter never skews the numbers |
 
 (Expect this list to grow; add rows here as resolvers are added.)
 

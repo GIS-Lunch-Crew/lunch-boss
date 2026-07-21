@@ -5,20 +5,26 @@ import ForgeReconciler, {
   Inline,
   SectionMessage,
   Stack,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
   Text,
 } from "@forge/react";
 import { events, invoke, requestConfluence, view } from "@forge/bridge";
 import { describeError, unwrap } from "./lib/invoke";
 import CurrentOrder from "./components/CurrentOrder";
 import type { OrderPrefill, SelectionTarget } from "./components/CurrentOrder";
+import HomeStats from "./components/HomeStats";
 import OrderHistory from "./components/OrderHistory";
-import RestaurantForm from "./components/RestaurantForm";
+import RestaurantFormModal from "./components/RestaurantFormModal";
 import type { RestaurantFields } from "./components/RestaurantForm";
 import RestaurantTable from "./components/RestaurantTable";
 import type {
   AddRestaurantResult,
   CurrentSubmission,
   CurrentSubmissionResult,
+  OrderStats,
   PlacedOrder,
   Restaurant,
 } from "../types";
@@ -67,11 +73,17 @@ const App = () => {
   // reset/prefill) even when the same restaurant is selected again.
   const [selectionVersion, setSelectionVersion] = useState(0);
   const [editing, setEditing] = useState<Restaurant | null>(null);
+  // Add/Edit Restaurant modal open-state, separate from `editing` since the
+  // modal can be open in either add-mode (no `editing`) or edit-mode.
+  const [addModalOpen, setAddModalOpen] = useState(false);
   const [orders, setOrders] = useState<PlacedOrder[] | null>(null);
   const [orderFilter, setOrderFilter] = useState<{
     from?: string;
     to?: string;
   }>({});
+  // null = still loading. Fetched via a dedicated resolver (not derived from
+  // `orders`) so a History-tab date filter never silently skews the counts.
+  const [stats, setStats] = useState<OrderStats | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
   const [busy, setBusy] = useState(false);
   const [environmentType, setEnvironmentType] = useState<string | null>(null);
@@ -79,6 +91,8 @@ const App = () => {
   const [displayName, setDisplayName] = useState<string | null>(null);
   // Bumped after a successful add so the (uncontrolled) form fields clear.
   const [formVersion, setFormVersion] = useState(0);
+  // Not persisted; always resets to Home on load.
+  const [activeTab, setActiveTab] = useState(0);
 
   // --- Data fetching ---
   const refresh = useCallback(async () => {
@@ -102,9 +116,18 @@ const App = () => {
     }
   }, []);
 
+  const refreshStats = useCallback(async () => {
+    try {
+      setStats(unwrap(await invoke<OrderStats>("getOrderStats")));
+    } catch (error) {
+      setMessage({ appearance: "error", text: describeError(error) });
+    }
+  }, []);
+
   useEffect(() => {
     refresh();
     refreshSubmission();
+    refreshStats();
     view
       .getContext()
       .then((context) => setEnvironmentType(context.environmentType));
@@ -115,7 +138,7 @@ const App = () => {
         setDisplayName(user.displayName ?? null),
       )
       .catch(() => setDisplayName(null));
-  }, [refresh, refreshSubmission]);
+  }, [refresh, refreshSubmission, refreshStats]);
 
   const refreshOrders = useCallback(async () => {
     try {
@@ -191,6 +214,10 @@ const App = () => {
     // No prefill (plain select / random pick) clears any staged re-order.
     setPrefill(withPrefill ?? null);
     setSelectionVersion((version) => version + 1);
+    // Current Order (where the selecting stage renders) lives on Home —
+    // jump there regardless of which tab triggered the selection (Restaurants'
+    // "Select" row action or History's "Re-order").
+    setActiveTab(0);
   };
 
   // The wheel (Custom UI inside a Frame) reports its winner through the
@@ -313,6 +340,7 @@ const App = () => {
       setSubmission(null);
       setMessage({ appearance: "success", text: "Order placed." });
       await refreshOrders();
+      await refreshStats();
     });
 
   const handleDelete = (restaurantId: number) =>
@@ -355,10 +383,15 @@ const App = () => {
   const restaurantFormKey = editing
     ? `edit-${editing.id}`
     : `add-${formVersion}`;
+  const restaurantModalOpen = addModalOpen || editing !== null;
+  const closeRestaurantModal = () => {
+    setEditing(null);
+    setAddModalOpen(false);
+  };
 
   return (
-    <Stack space="space.300">
-      <Inline spread="space-between" alignBlock="center">
+    <Stack grow="fill" space="space.300">
+      <Inline grow="fill" spread="space-between" alignBlock="center">
         <Heading as="h1">Lunch Boss</Heading>
         {environmentType !== null && environmentType !== "PRODUCTION" && (
           <Button isDisabled={busy} onClick={handleRunMigrations}>
@@ -375,55 +408,101 @@ const App = () => {
         </SectionMessage>
       )}
 
-      <CurrentOrder
-        key={orderKey}
-        submission={submission}
-        selected={selected}
-        prefill={prefill}
-        busy={busy}
-        poolEmpty={(restaurants ?? []).length === 0}
-        wheelOpen={wheelOpen}
-        onCancelWheel={() => setWheelOpen(false)}
-        onPickRandom={pickRandom}
-        onCancelSelection={cancelSelection}
-        onSubmitOrder={handleSubmitOrder}
-        onSaveSubmission={handleSaveSubmission}
-        onClearSubmission={handleClearSubmission}
-        onPlaceOrder={handlePlaceOrder}
-      />
+      <Tabs
+        id="lunch-boss-tabs"
+        selected={activeTab}
+        onChange={(index) => setActiveTab(index)}
+      >
+        <TabList>
+          <Tab>Home</Tab>
+          <Tab>Restaurants</Tab>
+          <Tab>History</Tab>
+        </TabList>
 
-      <RestaurantForm
-        key={restaurantFormKey}
-        editing={editing}
-        busy={busy}
-        onSubmit={handleRestaurantSubmit}
-        onCancel={() => setEditing(null)}
-        onDelete={handleDelete}
-      />
+        <TabPanel>
+          <Stack grow="fill" space="space.300">
+            <Stack grow="fill" space="space.150">
+              <Heading as="h2">Current order</Heading>
+              <CurrentOrder
+                key={orderKey}
+                submission={submission}
+                selected={selected}
+                prefill={prefill}
+                busy={busy}
+                poolEmpty={(restaurants ?? []).length === 0}
+                wheelOpen={wheelOpen}
+                onCancelWheel={() => setWheelOpen(false)}
+                onPickRandom={pickRandom}
+                onCancelSelection={cancelSelection}
+                onSubmitOrder={handleSubmitOrder}
+                onSaveSubmission={handleSaveSubmission}
+                onClearSubmission={handleClearSubmission}
+                onPlaceOrder={handlePlaceOrder}
+              />
+            </Stack>
 
-      <RestaurantTable
-        restaurants={restaurants}
-        busy={busy}
-        selectionDisabled={submission != null}
-        selectedRestaurantId={selected?.id ?? submission?.restaurantId ?? null}
-        onSelect={startSelection}
-        onEdit={(restaurant) => {
-          setMessage(null);
-          setEditing(restaurant);
-        }}
-        onRemove={handleRemove}
-      />
+            <Stack grow="fill" space="space.150">
+              <Heading as="h2">Stats</Heading>
+              <HomeStats stats={stats} />
+            </Stack>
+          </Stack>
+        </TabPanel>
 
-      <OrderHistory
-        key={`history-${orderFilter.from ?? ""}-${orderFilter.to ?? ""}`}
-        orders={orders}
-        from={orderFilter.from}
-        to={orderFilter.to}
-        busy={busy}
-        reorderDisabled={submission != null}
-        onFilterChange={(from, to) => setOrderFilter({ from, to })}
-        onReorder={handleReorder}
-      />
+        <TabPanel>
+          <Stack grow="fill" space="space.300">
+            <Stack grow="fill" space="space.150">
+              <Heading as="h2">My restaurant pool</Heading>
+              <RestaurantTable
+                restaurants={restaurants}
+                busy={busy}
+                selectionDisabled={submission != null}
+                selectedRestaurantId={selected?.id ?? submission?.restaurantId ?? null}
+                onSelect={startSelection}
+                onEdit={(restaurant) => {
+                  setMessage(null);
+                  setEditing(restaurant);
+                }}
+                onRemove={handleRemove}
+              />
+              <Inline>
+                <Button
+                  appearance="primary"
+                  isDisabled={busy}
+                  onClick={() => setAddModalOpen(true)}
+                >
+                  Add restaurant
+                </Button>
+              </Inline>
+            </Stack>
+
+            <RestaurantFormModal
+              key={restaurantFormKey}
+              isOpen={restaurantModalOpen}
+              editing={editing}
+              busy={busy}
+              onSubmit={handleRestaurantSubmit}
+              onCancel={closeRestaurantModal}
+              onDelete={handleDelete}
+            />
+          </Stack>
+        </TabPanel>
+
+        <TabPanel>
+          <Stack grow="fill" space="space.150">
+            <Heading as="h2">Order history</Heading>
+            <OrderHistory
+              key={`history-${orderFilter.from ?? ""}-${orderFilter.to ?? ""}`}
+              orders={orders}
+              from={orderFilter.from}
+              to={orderFilter.to}
+              busy={busy}
+              reorderDisabled={submission != null}
+              onFilterChange={(from, to) => setOrderFilter({ from, to })}
+              onReorder={handleReorder}
+            />
+          </Stack>
+        </TabPanel>
+      </Tabs>
     </Stack>
   );
 };

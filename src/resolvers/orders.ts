@@ -9,6 +9,7 @@ import { requireAccountId } from "./context";
 import type {
   CurrentSubmission,
   CurrentSubmissionResult,
+  OrderStats,
   PlacedOrder,
 } from "../types";
 
@@ -45,6 +46,10 @@ export const registerOrderResolvers = (resolver: Resolver): void => {
       return orderService.getOrders(requireAccountId(context), input);
     },
   );
+
+  resolver.define<void, OrderStats>("getOrderStats", async ({ context }) => {
+    return orderService.getOrderStats(requireAccountId(context));
+  });
 
   resolver.define<void, void>("clearSubmission", async ({ context }) => {
     await orderService.clearSubmission(requireAccountId(context));

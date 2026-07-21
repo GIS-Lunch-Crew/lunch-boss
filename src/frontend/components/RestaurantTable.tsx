@@ -2,7 +2,6 @@ import React from "react";
 import {
   Button,
   DynamicTable,
-  Heading,
   Inline,
   Spinner,
   Stack,
@@ -92,8 +91,7 @@ const RestaurantTable = ({
   }));
 
   return (
-    <Stack space="space.100">
-      <Heading as="h2">My restaurant pool</Heading>
+    <Stack grow="fill" space="space.100">
       {restaurants === null ? (
         <Spinner label="Loading your restaurants" />
       ) : restaurants.length === 0 ? (

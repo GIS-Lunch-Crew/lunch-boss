@@ -1,8 +1,6 @@
 import React, { useState } from "react";
 import {
   Button,
-  Frame,
-  Heading,
   Inline,
   Label,
   Spinner,
@@ -12,6 +10,7 @@ import {
   TextArea,
   Textfield,
 } from "@forge/react";
+import WheelModal from "./WheelModal";
 import type { CurrentSubmission } from "../../types";
 
 // All the selection stage needs to render — a full Restaurant satisfies it,
@@ -87,38 +86,22 @@ const CurrentOrder = ({
 
   // --- Stage: loading ---
   if (submission === undefined) {
-    return (
-      <Stack space="space.100">
-        <Heading as="h2">Current order</Heading>
-        <Spinner label="Loading your order" />
-      </Stack>
-    );
+    return <Spinner label="Loading your order" />;
   }
 
-  // --- Stage: spinning the wheel ---
-  // The wheel takes over the panel while open (also covers re-picks from
-  // the selection stage); its result lands via the host's event listener.
-  if (!submission && wheelOpen) {
-    return (
-      <Stack space="space.100">
-        <Heading as="h2">Current order</Heading>
-        <Text>Spin the wheel, fate picks where you're eating!</Text>
-        <Frame resource="wheel" />
-        <Inline>
-          <Button appearance="subtle" isDisabled={busy} onClick={onCancelWheel}>
-            Cancel
-          </Button>
-        </Inline>
-      </Stack>
-    );
-  }
+  // The wheel is a Modal overlay now (WheelModal), so it can be rendered as
+  // a plain sibling — it no longer needs to hijack the panel to avoid
+  // layout shift, and it's reachable from both the no-selection and
+  // selecting stages (re-pick).
+  const wheelModal = (
+    <WheelModal isOpen={wheelOpen} busy={busy} onCancel={onCancelWheel} />
+  );
 
   // --- Stage: nothing selected yet ---
   if (submission == null) {
     if (!selected) {
       return (
-        <Stack space="space.100">
-          <Heading as="h2">Current order</Heading>
+        <Stack grow="fill" space="space.100">
           <Text>
             No order in progress. Select a restaurant from your pool below, or
             let fate decide!
@@ -128,6 +111,7 @@ const CurrentOrder = ({
               Pick a random restaurant
             </Button>
           </Inline>
+          {wheelModal}
         </Stack>
       );
     }
@@ -135,8 +119,7 @@ const CurrentOrder = ({
     // --- Stage: selecting (restaurant chosen, order not yet submitted) ---
     // fields seed the submission.
     return (
-      <Stack space="space.100">
-        <Heading as="h2">Current order</Heading>
+      <Stack grow="fill" space="space.100">
         <Text>
           Ordering from <Strong>{selected.name}</Strong>. Submit to lock it in.
         </Text>
@@ -177,6 +160,7 @@ const CurrentOrder = ({
             Cancel
           </Button>
         </Inline>
+        {wheelModal}
       </Stack>
     );
   }
@@ -184,8 +168,7 @@ const CurrentOrder = ({
   // --- Stage: submitted (read-only view) ---
   if (!editingDetails) {
     return (
-      <Stack space="space.100">
-        <Heading as="h2">Current order</Heading>
+      <Stack grow="fill" space="space.100">
         <Text>
           Submitted for <Strong>{submission.restaurantName}</Strong>. The
           restaurant is locked. Clear the order to choose a different one.
@@ -217,8 +200,7 @@ const CurrentOrder = ({
 
   // --- Stage: editing a submitted order ---
   return (
-    <Stack space="space.100">
-      <Heading as="h2">Current order</Heading>
+    <Stack grow="fill" space="space.100">
       <Text>
         Editing order for <Strong>{submission.restaurantName}</Strong>. The
         restaurant stays locked — clear the order to choose a different one.
