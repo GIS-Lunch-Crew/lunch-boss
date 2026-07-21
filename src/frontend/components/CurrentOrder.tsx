@@ -87,6 +87,7 @@ const CurrentOrder = ({
 	// Submitted orders are read-only until the user explicitly edits them.
 	const [editingDetails, setEditingDetails] = useState(false);
 
+	// --- Stage: loading ---
 	if (submission === undefined) {
 		return (
 			<Stack space="space.100">
@@ -96,6 +97,7 @@ const CurrentOrder = ({
 		);
 	}
 
+	// --- Stage: spinning the wheel ---
 	// The wheel takes over the panel while open (also covers re-picks from
 	// the selection stage); its result lands via the host's event listener.
 	if (!submission && wheelOpen) {
@@ -113,6 +115,7 @@ const CurrentOrder = ({
 		);
 	}
 
+	// --- Stage: nothing selected yet ---
 	if (submission == null) {
 		if (!selected) {
 			return (
@@ -131,7 +134,8 @@ const CurrentOrder = ({
 			);
 		}
 
-		// Selecting stage: fields seed the submission.
+		// --- Stage: selecting (restaurant chosen, order not yet submitted) ---
+		// fields seed the submission.
 		return (
 			<Stack space="space.100">
 				<Heading as="h2">Current order</Heading>
@@ -179,6 +183,7 @@ const CurrentOrder = ({
 		);
 	}
 
+	// --- Stage: submitted (read-only view) ---
 	if (!editingDetails) {
 		return (
 			<Stack space="space.100">
@@ -212,6 +217,7 @@ const CurrentOrder = ({
 		);
 	}
 
+	// --- Stage: editing a submitted order ---
 	return (
 		<Stack space="space.100">
 			<Heading as="h2">Current order</Heading>

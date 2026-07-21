@@ -1,3 +1,5 @@
+/** @format */
+
 import React, { useCallback, useEffect, useState } from "react";
 import ForgeReconciler, {
 	Button,
@@ -10,10 +12,7 @@ import ForgeReconciler, {
 import { events, invoke, requestConfluence, view } from "@forge/bridge";
 import { describeError, unwrap } from "./lib/invoke";
 import CurrentOrder from "./components/CurrentOrder";
-import type {
-  OrderPrefill,
-  SelectionTarget,
-} from "./components/CurrentOrder";
+import type { OrderPrefill, SelectionTarget } from "./components/CurrentOrder";
 import OrderHistory from "./components/OrderHistory";
 import RestaurantForm from "./components/RestaurantForm";
 import type { RestaurantFields } from "./components/RestaurantForm";
@@ -83,6 +82,7 @@ const App = () => {
 	// Bumped after a successful add so the (uncontrolled) form fields clear.
 	const [formVersion, setFormVersion] = useState(0);
 
+	// --- Data fetching ---
 	const refresh = useCallback(async () => {
 		try {
 			setRestaurants(unwrap(await invoke<Restaurant[]>("getSavedRestaurants")));
@@ -135,6 +135,7 @@ const App = () => {
 		refreshOrders();
 	}, [refreshOrders]);
 
+	// --- Shared action wrapper ---
 	// Wraps a mutation handler with the shared busy/message bookkeeping.
 	const runAction = async (action: () => Promise<void>) => {
 		setBusy(true);
@@ -151,7 +152,6 @@ const App = () => {
 	};
 
 	// --- Restaurant pool ---
-
 	const handleRestaurantSubmit = (fields: RestaurantFields) =>
 		runAction(async () => {
 			if (editing) {
@@ -184,7 +184,6 @@ const App = () => {
 		});
 
 	// --- Order lifecycle (CONTEXT.md §3.12) ---
-
 	const startSelection = (
 		target: SelectionTarget,
 		withPrefill?: OrderPrefill,
@@ -344,6 +343,7 @@ const App = () => {
 			await refreshSubmission();
 		});
 
+	// --- Render ---
 	// Remount keys: components hold their field state locally and re-read
 	// initial values only on mount, so the key encodes the lifecycle stage.
 	const orderKey =
@@ -354,7 +354,9 @@ const App = () => {
 				: selected
 					? `sel-${selected.id}-v${selectionVersion}`
 					: "none";
-  const restaurantFormKey = editing ? `edit-${editing.id}` : `add-${formVersion}`;
+	const restaurantFormKey = editing
+		? `edit-${editing.id}`
+		: `add-${formVersion}`;
 
 	return (
 		<Stack space="space.300">

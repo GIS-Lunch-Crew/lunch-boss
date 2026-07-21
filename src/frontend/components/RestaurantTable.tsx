@@ -50,6 +50,7 @@ const RestaurantTable = ({
         key: "address",
         content: restaurant.address === "" ? "N/A" : restaurant.address,
       },
+      // --- Row actions ---
       {
         key: "actions",
         content: (

@@ -76,6 +76,7 @@ const RestaurantForm = ({
         defaultValue={menuUrl}
         onChange={(event) => setMenuUrl(event.target.value)}
       />
+      {/* --- Actions --- */}
       <Inline space="space.100">
         <Button
           appearance="primary"

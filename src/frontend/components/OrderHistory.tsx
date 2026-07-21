@@ -90,6 +90,7 @@ const OrderHistory = ({
   return (
     <Stack space="space.100">
       <Heading as="h2">Order history</Heading>
+      {/* --- Date filter controls --- */}
       <Inline space="space.200" alignBlock="end">
         <Stack space="space.050">
           <Label labelFor="historyFrom">From</Label>
