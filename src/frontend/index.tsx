@@ -212,6 +212,10 @@ const App = () => {
     // No prefill (plain select / random pick) clears any staged re-order.
     setPrefill(withPrefill ?? null);
     setSelectionVersion((version) => version + 1);
+    // Current Order (where the selecting stage renders) lives on Home —
+    // jump there regardless of which tab triggered the selection (Restaurants'
+    // "Select" row action or History's "Re-order").
+    setActiveTab(0);
   };
 
   // The wheel (Custom UI inside a Frame) reports its winner through the
