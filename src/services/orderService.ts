@@ -5,6 +5,7 @@ import * as orderRepository from "../storage/orderRepository";
 import type {
   CurrentSubmission,
   GetOrdersInput,
+  OrderStats,
   PlacedOrder,
   SubmitOrderInput,
   UpdateSubmissionInput,
@@ -87,6 +88,18 @@ export const getOrders = async (
   input: GetOrdersInput,
 ): Promise<PlacedOrder[]> =>
   orderRepository.listByAccount(accountId, input.from, input.to);
+
+export const getOrderStats = async (accountId: string): Promise<OrderStats> => {
+  const [pool, orderStats] = await Promise.all([
+    savedRestaurantRepository.listByAccount(accountId),
+    orderRepository.getStats(accountId),
+  ]);
+  return {
+    totalRestaurants: pool.length,
+    totalOrders: orderStats.totalOrders,
+    topRestaurant: orderStats.topRestaurant,
+  };
+};
 
 export const clearSubmission = async (accountId: string): Promise<void> => {
   await submissionRepository.remove(accountId);
