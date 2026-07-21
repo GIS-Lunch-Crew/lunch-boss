@@ -285,16 +285,16 @@ a spinning wheel lifted from `hector/single-user-lunch-picker`:
   and closes the Modal. The Cancel button lives host-side in `ModalFooter`,
   so the wheel component needed no changes for cancellation.
 
-### 3.14 Layout redesign: collapsible sections, tabs, and modals
+### 3.14 Layout redesign: tabs and modals
 
 The single always-visible `<Stack>` of sections was restructured for
 intuitiveness:
 
-- **Collapsible sections** (`CollapsibleSection.tsx`): UI Kit has no
-  Accordion/Expander and no way to animate anything (no DOM access, XCSS has
-  no `transition` property) — sections toggle instantly (no animation), with
-  a caret (`Icon` glyph swapping `chevron-right`/`chevron-down`) built on
-  `Pressable`, the UI Kit primitive for custom clickable containers.
+- **Sections were briefly collapsible** (`CollapsibleSection.tsx`, built on
+  `Pressable` + a chevron `Icon` glyph swap, since UI Kit has no
+  Accordion/Expander or animation capability), but that was removed once the
+  tab split (below) already solved the single-column clutter problem it was
+  meant to address — sections are now static, each with a plain `Heading`.
 - **Three top-level tabs** (`Tabs`/`TabList`/`TabPanel`, natively supported
   in UI Kit): Home (Current order + Stats), Restaurants (pool + Add/Edit
   modal), History (order history). Not persisted — always resets to Home on
