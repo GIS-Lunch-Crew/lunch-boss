@@ -13,7 +13,6 @@ import ForgeReconciler, {
 } from "@forge/react";
 import { events, invoke, requestConfluence, view } from "@forge/bridge";
 import { describeError, unwrap } from "./lib/invoke";
-import CollapsibleSection from "./components/CollapsibleSection";
 import CurrentOrder from "./components/CurrentOrder";
 import type { OrderPrefill, SelectionTarget } from "./components/CurrentOrder";
 import HomeStats from "./components/HomeStats";
@@ -92,8 +91,7 @@ const App = () => {
   const [displayName, setDisplayName] = useState<string | null>(null);
   // Bumped after a successful add so the (uncontrolled) form fields clear.
   const [formVersion, setFormVersion] = useState(0);
-  // Not persisted; always resets to Home on load, same as the collapsible
-  // sections' default-expanded state.
+  // Not persisted; always resets to Home on load.
   const [activeTab, setActiveTab] = useState(0);
 
   const refresh = useCallback(async () => {
@@ -416,7 +414,8 @@ const App = () => {
 
         <TabPanel>
           <Stack grow="fill" space="space.300">
-            <CollapsibleSection title="Current order">
+            <Stack grow="fill" space="space.150">
+              <Heading as="h2">Current order</Heading>
               <CurrentOrder
                 key={orderKey}
                 submission={submission}
@@ -433,40 +432,40 @@ const App = () => {
                 onClearSubmission={handleClearSubmission}
                 onPlaceOrder={handlePlaceOrder}
               />
-            </CollapsibleSection>
+            </Stack>
 
-            <CollapsibleSection title="Stats">
+            <Stack grow="fill" space="space.150">
+              <Heading as="h2">Stats</Heading>
               <HomeStats stats={stats} />
-            </CollapsibleSection>
+            </Stack>
           </Stack>
         </TabPanel>
 
         <TabPanel>
           <Stack grow="fill" space="space.300">
-            <CollapsibleSection title="My restaurant pool">
-              <Stack grow="fill" space="space.150">
-                <RestaurantTable
-                  restaurants={restaurants}
-                  busy={busy}
-                  selectionDisabled={submission != null}
-                  onSelect={startSelection}
-                  onEdit={(restaurant) => {
-                    setMessage(null);
-                    setEditing(restaurant);
-                  }}
-                  onRemove={handleRemove}
-                />
-                <Inline>
-                  <Button
-                    appearance="primary"
-                    isDisabled={busy}
-                    onClick={() => setAddModalOpen(true)}
-                  >
-                    Add restaurant
-                  </Button>
-                </Inline>
-              </Stack>
-            </CollapsibleSection>
+            <Stack grow="fill" space="space.150">
+              <Heading as="h2">My restaurant pool</Heading>
+              <RestaurantTable
+                restaurants={restaurants}
+                busy={busy}
+                selectionDisabled={submission != null}
+                onSelect={startSelection}
+                onEdit={(restaurant) => {
+                  setMessage(null);
+                  setEditing(restaurant);
+                }}
+                onRemove={handleRemove}
+              />
+              <Inline>
+                <Button
+                  appearance="primary"
+                  isDisabled={busy}
+                  onClick={() => setAddModalOpen(true)}
+                >
+                  Add restaurant
+                </Button>
+              </Inline>
+            </Stack>
 
             <RestaurantFormModal
               key={restaurantFormKey}
@@ -481,7 +480,8 @@ const App = () => {
         </TabPanel>
 
         <TabPanel>
-          <CollapsibleSection title="Order history">
+          <Stack grow="fill" space="space.150">
+            <Heading as="h2">Order history</Heading>
             <OrderHistory
               key={`history-${orderFilter.from ?? ""}-${orderFilter.to ?? ""}`}
               orders={orders}
@@ -492,7 +492,7 @@ const App = () => {
               onFilterChange={(from, to) => setOrderFilter({ from, to })}
               onReorder={handleReorder}
             />
-          </CollapsibleSection>
+          </Stack>
         </TabPanel>
       </Tabs>
     </Stack>
