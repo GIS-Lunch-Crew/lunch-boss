@@ -21,7 +21,7 @@ const HomeStats = ({ stats }: Props) => {
       <Text>
         Most-picked restaurant:{" "}
         {stats.topRestaurant
-          ? `${stats.topRestaurant.restaurantName} (${stats.topRestaurant.count}×)`
+          ? `${stats.topRestaurant.restaurantName} (${stats.topRestaurant.count}x)`
           : "—"}
       </Text>
     </Stack>
