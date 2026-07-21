@@ -53,7 +53,7 @@ type Props = {
 		itemsText: string,
 		totalText: string,
 		notesText: string,
-	) => Promise<void> | void;
+	) => Promise<boolean>;
 	onClearSubmission: () => void;
 	onPlaceOrder: () => void;
 };
@@ -242,8 +242,10 @@ const CurrentOrder = ({
 					appearance="primary"
 					isDisabled={busy}
 					onClick={async () => {
-						await onSaveSubmission(items, total, notes);
-						setEditingDetails(false);
+						const wasSaved = await onSaveSubmission(items, total, notes);
+						if (wasSaved) {
+							setEditingDetails(false);
+						}
 					}}
 				>
 					Save changes
