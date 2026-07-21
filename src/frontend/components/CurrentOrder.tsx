@@ -185,7 +185,7 @@ const CurrentOrder = ({
 				<Heading as="h2">Current order</Heading>
 				<Text>
 					Submitted for <Strong>{submission.restaurantName}</Strong>. The
-					restaurant is locked — clear the order to choose a different one.
+					restaurant is locked. Clear the order to choose a different one.
 				</Text>
 				<Text>Order: {submission.items ?? "—"}</Text>
 				<Text>
