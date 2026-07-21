@@ -203,7 +203,7 @@ const CurrentOrder = ({
     <Stack grow="fill" space="space.100">
       <Text>
         Editing order for <Strong>{submission.restaurantName}</Strong>. The
-        restaurant stays locked — clear the order to choose a different one.
+        restaurant stays locked. Clear the order to choose a different one.
       </Text>
       <Label labelFor="orderItems">Order</Label>
       <TextArea

@@ -29,7 +29,7 @@ const WheelModal = ({ isOpen, busy, onCancel }: Props) => (
           <ModalTitle>Spin the wheel</ModalTitle>
         </ModalHeader>
         <ModalBody>
-          <Text>Spin the wheel — fate picks where you're eating.</Text>
+          <Text>Spin the wheel. Fate picks where you're eating.</Text>
           <Frame resource="wheel" />
         </ModalBody>
         <ModalFooter>
