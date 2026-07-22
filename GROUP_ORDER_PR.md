@@ -36,7 +36,7 @@ stays in force and unchanged:
   order" and behaves exactly as today. Solo select/random/submit/edit/clear/
   place are unchanged.
 - The solo submit-invariant (submitting auto-saves the restaurant to your pool,
-  §3.12) is unchanged **for the solo flow**. Only *outing* orders differ here —
+  §3.12) is unchanged **for the solo flow**. Only _outing_ orders differ here —
   they do not auto-save (opt-in toggle instead; see Design Decisions).
 - Solo selection/wheel still spins your own pool.
 - Soft-delete, resurrect-on-readd, restaurant identity/normalization (§3.10),
@@ -154,3 +154,21 @@ team / Lunch Boss / date transitively through the outing.
 **Unchanged:** `restaurants`, `user_saved_restaurants`,
 `user_current_submission` (solo, PK `account_id`), and the solo columns on
 `orders`. Solo flow keeps working exactly as-is.
+
+---
+
+## Implementation Log
+
+### Commit 1 — order history dates timezone-correct (`4a93ac9`)
+
+Prep, independent of the group feature: establishes the store-UTC /
+convert-at-the-edges convention the outing-time work depends on. Order history
+now maps the viewer's **local** calendar day to a UTC window on the way in, and
+renders stored UTC timestamps in the viewer's **local** time on the way out.
+
+| File                                       | Purpose                                                                                                                                                                                                                         |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/validation/orderSchemas.ts`           | `getOrders` now accepts `from`/`to` as UTC instants (`YYYY-MM-DD HH:MM:SS`) instead of `YYYY-MM-DD` dates.                                                                                                                      |
+| `src/storage/orderRepository.ts`           | Filters `ordered_at` directly against a **half-open** UTC range (`>= from AND < to`) instead of `DATE(ordered_at)`. Fixes the near-midnight "wrong day" straddle and keeps the range sargable for `idx_orders_account_ordered`. |
+| `src/frontend/index.tsx`                   | Converts each picked local calendar day into UTC instant bounds before invoking `getOrders`; the `DatePicker`/filter state still deal in local dates.                                                                           |
+| `src/frontend/components/OrderHistory.tsx` | `formatDate` parses the zone-less DB timestamp as UTC and renders it in the viewer's local time; updated the now-stale filter caveat comment.                                                                                   |
