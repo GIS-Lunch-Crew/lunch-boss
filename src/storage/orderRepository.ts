@@ -19,6 +19,11 @@ type OrderRow = Omit<PlacedOrder, "total"> & { total: string | number | null };
 
 // The restaurants JOIN intentionally ignores deleted_at: history must keep
 // showing a restaurant's name after it is soft-deleted.
+// `from`/`to` are half-open UTC instant bounds [from, to) — the range is
+// computed client-side from the picked local day. Comparing ordered_at
+// directly (not wrapped in DATE()) keeps the compare sargable so
+// idx_orders_account_ordered can serve the range, and avoids the old
+// DATE()-in-DB-clock straddle at midnight.
 export const listByAccount = async (
   accountId: string,
   from: string | undefined,
@@ -27,11 +32,11 @@ export const listByAccount = async (
   const conditions = ["o.account_id = ?"];
   const params: (string | number)[] = [accountId];
   if (from !== undefined) {
-    conditions.push("DATE(o.ordered_at) >= ?");
+    conditions.push("o.ordered_at >= ?");
     params.push(from);
   }
   if (to !== undefined) {
-    conditions.push("DATE(o.ordered_at) <= ?");
+    conditions.push("o.ordered_at < ?");
     params.push(to);
   }
 
@@ -115,4 +120,38 @@ export const insert = async (
     .execute();
 
   return result.rows.insertId;
+};
+
+// Batch placement from an event: one history row per participant, all with
+// event_id set. One multi-row INSERT; ordered_at takes the table default
+// (CURRENT_TIMESTAMP — the placement moment, like solo).
+export const insertMany = async (
+  rows: {
+    accountId: string;
+    restaurantId: number;
+    items: string | null;
+    total: number | null;
+    notes: string | null;
+    eventId: number;
+  }[],
+): Promise<void> => {
+  if (rows.length === 0) {
+    return;
+  }
+  const placeholders = rows.map(() => "(?, ?, ?, ?, ?, ?)").join(", ");
+  const params = rows.flatMap((row) => [
+    row.accountId,
+    row.restaurantId,
+    row.items,
+    row.total,
+    row.notes,
+    row.eventId,
+  ]);
+  await sql
+    .prepare<UpdateQueryResponse>(
+      `INSERT INTO orders (account_id, restaurant_id, items, total, notes, event_id)
+       VALUES ${placeholders}`,
+    )
+    .bindParams(...params)
+    .execute();
 };

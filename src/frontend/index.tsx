@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import ForgeReconciler, {
   Box,
   Button,
@@ -22,13 +22,24 @@ import OrderHistory from "./components/OrderHistory";
 import RestaurantFormModal from "./components/RestaurantFormModal";
 import type { RestaurantFields } from "./components/RestaurantForm";
 import RestaurantTable from "./components/RestaurantTable";
+import TeamsPanel from "./components/TeamsPanel";
+import OutingsSection from "./components/OutingsSection";
+import CreateOutingModal from "./components/CreateOutingModal";
+import EventDetailModal from "./components/EventDetailModal";
+import EditEventModal from "./components/EditEventModal";
 import type {
+  AbandonEventResult,
   AddRestaurantResult,
+  CreateTeamResult,
   CurrentSubmission,
   CurrentSubmissionResult,
+  EventDetail,
+  EventOrder,
+  EventSummary,
   OrderStats,
   PlacedOrder,
   Restaurant,
+  Team,
 } from "../types";
 
 type Message = {
@@ -68,6 +79,40 @@ const parseTotal = (text: string): number | undefined | "invalid" => {
     : value;
 };
 
+// Order-history date filters. The picker deals in local calendar dates, but
+// ordered_at is a UTC instant, so we convert each picked local day into UTC
+// instant bounds and query the half-open range [from, to). This makes "today"
+// mean the viewer's local day regardless of the database clock.
+const toMysqlUtc = (date: Date): string =>
+  date.toISOString().slice(0, 19).replace("T", " ");
+const localDayStartUtc = (isoDate: string): string => {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return toMysqlUtc(new Date(y, m - 1, d));
+};
+const localDayEndUtc = (isoDate: string): string => {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return toMysqlUtc(new Date(y, m - 1, d + 1));
+};
+
+// Today as a local YYYY-MM-DD (for the outing date picker + today's-outings
+// bounds).
+const todayLocalDate = (): string => {
+  const now = new Date();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${m}-${d}`;
+};
+
+// A picked local date ("YYYY-MM-DD") + time ("HH:mm", trailing seconds/zone
+// tolerated) → a UTC instant string for the backend.
+const localDateTimeToUtc = (date: string, time: string): string => {
+  const [y, mo, d] = date.split("-").map(Number);
+  const match = time.match(/^(\d{1,2}):(\d{2})/);
+  const h = match ? Number(match[1]) : 0;
+  const mi = match ? Number(match[2]) : 0;
+  return toMysqlUtc(new Date(y, mo - 1, d, h, mi, 0, 0));
+};
+
 const App = () => {
   // null = pool still loading; undefined = submission still loading.
   const [restaurants, setRestaurants] = useState<Restaurant[] | null>(null);
@@ -76,8 +121,16 @@ const App = () => {
   >(undefined);
   const [selected, setSelected] = useState<SelectionTarget | null>(null);
   const [prefill, setPrefill] = useState<OrderPrefill | null>(null);
-  // True while the spin-the-wheel Frame is showing (pool of 2+ only).
+  // True while the solo spin-the-wheel Frame is showing (pool of 2+ only).
   const [wheelOpen, setWheelOpen] = useState(false);
+  // Why the wheel was last opened. The wheel emits its winner to one shared
+  // channel; this tells the (once-subscribed) handler where to route it. A ref,
+  // not state, because the handler captures its value at subscribe-time — state
+  // would go stale and misroute a create-panel spin to the solo flow.
+  const wheelPurposeRef = useRef<"solo" | "create-event">("solo");
+  // A wheel result routed to the create panel (null until a spin lands there).
+  const [createEventWheelWinner, setCreateEventWheelWinner] =
+    useState<SelectionTarget | null>(null);
   // Bumped on every startSelection so CurrentOrder remounts (and its fields
   // reset/prefill) even when the same restaurant is selected again.
   const [selectionVersion, setSelectionVersion] = useState(0);
@@ -100,6 +153,23 @@ const App = () => {
   const [displayName, setDisplayName] = useState<string | null>(null);
   // Bumped after a successful add so the (uncontrolled) form fields clear.
   const [formVersion, setFormVersion] = useState(0);
+  // Teams: myTeams = the caller's memberships; allTeams = every site team
+  // (powers the join dropdown). null = still loading.
+  const [myTeams, setMyTeams] = useState<Team[] | null>(null);
+  const [allTeams, setAllTeams] = useState<Team[] | null>(null);
+  // Today's outings visible to the caller. null = still loading. Named
+  // `outings` (not `events`) to avoid colliding with the bridge Events API.
+  const [outings, setOutings] = useState<EventSummary[] | null>(null);
+  const [createOutingOpen, setCreateOutingOpen] = useState(false);
+  // The card the user clicked (null = detail page closed) and its full detail
+  // from getEvent (null = still loading). The summary seeds the instant paint.
+  const [openedEvent, setOpenedEvent] = useState<EventSummary | null>(null);
+  const [eventDetail, setEventDetail] = useState<EventDetail | null>(null);
+  // The boss's Edit Details modal (over the open event).
+  const [editEventOpen, setEditEventOpen] = useState(false);
+  // The caller's own accountId (view context) — tells the detail page
+  // whether the caller is the event's Lunch Boss. null until loaded.
+  const [myAccountId, setMyAccountId] = useState<string | null>(null);
   // Not persisted; always resets to Home on load.
   const [activeTab, setActiveTab] = useState(0);
 
@@ -133,13 +203,48 @@ const App = () => {
     }
   }, []);
 
+  const refreshTeams = useCallback(async () => {
+    try {
+      const [mine, all] = await Promise.all([
+        invoke<Team[]>("getMyTeams"),
+        invoke<Team[]>("getTeams"),
+      ]);
+      setMyTeams(unwrap(mine));
+      setAllTeams(unwrap(all));
+    } catch (error) {
+      setMessage({ appearance: "error", text: describeError(error) });
+      setMyTeams([]);
+      setAllTeams([]);
+    }
+  }, []);
+
+  const refreshOutings = useCallback(async () => {
+    try {
+      const today = todayLocalDate();
+      setOutings(
+        unwrap(
+          await invoke<EventSummary[]>("getTodaysEvents", {
+            from: localDayStartUtc(today),
+            to: localDayEndUtc(today),
+          }),
+        ),
+      );
+    } catch (error) {
+      setMessage({ appearance: "error", text: describeError(error) });
+      setOutings([]);
+    }
+  }, []);
+
   useEffect(() => {
     refresh();
     refreshSubmission();
     refreshStats();
-    view
-      .getContext()
-      .then((context) => setEnvironmentType(context.environmentType));
+    refreshTeams();
+    refreshOutings();
+    view.getContext().then((context) => {
+      setEnvironmentType(context.environmentType);
+      setMyAccountId(context.accountId ?? null);
+    });
     // Cosmetic — on failure just omit the greeting, no error banner.
     requestConfluence("/wiki/rest/api/user/current")
       .then((response) => response.json())
@@ -147,13 +252,14 @@ const App = () => {
         setDisplayName(user.displayName ?? null),
       )
       .catch(() => setDisplayName(null));
-  }, [refresh, refreshSubmission, refreshStats]);
+  }, [refresh, refreshSubmission, refreshStats, refreshTeams, refreshOutings]);
 
   const refreshOrders = useCallback(async () => {
     try {
-      setOrders(
-        unwrap(await invoke<PlacedOrder[]>("getOrders", { ...orderFilter })),
-      );
+      const params: { from?: string; to?: string } = {};
+      if (orderFilter.from) params.from = localDayStartUtc(orderFilter.from);
+      if (orderFilter.to) params.to = localDayEndUtc(orderFilter.to);
+      setOrders(unwrap(await invoke<PlacedOrder[]>("getOrders", params)));
     } catch (error) {
       setMessage({ appearance: "error", text: describeError(error) });
       setOrders([]);
@@ -213,6 +319,242 @@ const App = () => {
       await refresh();
     });
 
+  // --- Teams ---
+  // createTeam is create-or-join on the normalized name (like addRestaurant):
+  // a new name creates, an existing one joins. Outcome drives the message.
+  const handleCreateOrJoinByName = (name: string) =>
+    runAction(async () => {
+      const result = unwrap(
+        await invoke<CreateTeamResult>("createTeam", { name }),
+      );
+      setMessage({
+        appearance: "success",
+        text: result.outcome === "created" ? "Team created." : "Joined team.",
+      });
+      await refreshTeams();
+    });
+
+  const handleJoinTeam = (teamId: number) =>
+    runAction(async () => {
+      await invoke("joinTeam", { teamId });
+      setMessage({ appearance: "success", text: "Joined team." });
+      await refreshTeams();
+    });
+
+  const handleLeaveTeam = (teamId: number) =>
+    runAction(async () => {
+      await invoke("leaveTeam", { teamId });
+      setMessage({ appearance: "information", text: "Left team." });
+      await refreshTeams();
+    });
+
+  // --- Outings ---
+  const handleStartOuting = () => {
+    setMessage(null);
+    setCreateOutingOpen(true);
+  };
+
+  // Tag the next wheel result for the create panel before its Frame mounts, so
+  // the shared result handler routes the winner into the form (not solo).
+  const handleOpenCreateWheel = () => {
+    wheelPurposeRef.current = "create-event";
+  };
+
+  // Open the Event-detail page: paint from the card's summary immediately,
+  // then fill contact fields + orders when getEvent lands. On failure (e.g.
+  // the event was deleted, or visibility changed) close and refresh the strip.
+  const handleOpenEvent = (event: EventSummary) => {
+    setMessage(null);
+    setOpenedEvent(event);
+    setEventDetail(null);
+    invoke<EventDetail>("getEvent", { eventId: event.id })
+      .then((result) => setEventDetail(unwrap(result)))
+      .catch((error) => {
+        setMessage({ appearance: "error", text: describeError(error) });
+        setOpenedEvent(null);
+        refreshOutings();
+      });
+  };
+
+  const handleCloseEvent = () => {
+    setOpenedEvent(null);
+    setEventDetail(null);
+  };
+
+  // Re-fetch the open event after a write so the detail view (form state,
+  // orders table) reflects it.
+  const refreshEventDetail = async (eventId: number) => {
+    setEventDetail(unwrap(await invoke<EventDetail>("getEvent", { eventId })));
+  };
+
+  const handleSubmitEventOrder = (
+    itemsText: string,
+    totalText: string,
+    notesText: string,
+    addToPool: boolean,
+  ) => {
+    if (!openedEvent) {
+      return;
+    }
+    const total = parseTotal(totalText);
+    if (total === "invalid") {
+      setMessage({
+        appearance: "error",
+        text: "Total must be a non-negative number.",
+      });
+      return;
+    }
+    return runAction(async () => {
+      await invoke<EventOrder>("submitEventOrder", {
+        eventId: openedEvent.id,
+        ...(itemsText.trim() !== "" ? { items: itemsText } : {}),
+        ...(total !== undefined ? { total } : {}),
+        ...(notesText.trim() !== "" ? { notes: notesText } : {}),
+        ...(addToPool ? { addToPool: true } : {}),
+      });
+      setMessage({ appearance: "success", text: "Order submitted." });
+      await refreshEventDetail(openedEvent.id);
+      // The submit may have added to the pool (opt-in) or resurrected a
+      // deleted restaurant server-side; the order also counts toward strip
+      // visibility.
+      if (addToPool) {
+        await refresh();
+      }
+      await refreshOutings();
+    });
+  };
+
+  const handleSaveEventOrder = (
+    itemsText: string,
+    totalText: string,
+    notesText: string,
+  ): Promise<boolean> => {
+    if (!openedEvent) {
+      return Promise.resolve(false);
+    }
+    const total = parseTotal(totalText);
+    if (total === "invalid") {
+      setMessage({
+        appearance: "error",
+        text: "Total must be a non-negative number.",
+      });
+      return Promise.resolve(false);
+    }
+    return runAction(async () => {
+      await invoke("updateEventOrder", {
+        eventId: openedEvent.id,
+        ...(itemsText.trim() !== "" ? { items: itemsText } : {}),
+        ...(total !== undefined ? { total } : {}),
+        ...(notesText.trim() !== "" ? { notes: notesText } : {}),
+      });
+      setMessage({ appearance: "success", text: "Order updated." });
+      await refreshEventDetail(openedEvent.id);
+    });
+  };
+
+  const handleCancelEventOrder = () => {
+    if (!openedEvent) {
+      return;
+    }
+    return runAction(async () => {
+      await invoke("cancelEventOrder", { eventId: openedEvent.id });
+      setMessage({ appearance: "information", text: "Order canceled." });
+      await refreshEventDetail(openedEvent.id);
+      // Losing the order can change strip visibility.
+      await refreshOutings();
+    });
+  };
+
+  // Claim works from a card or the open detail page. A card claim also
+  // bubbles into the card's open-press (no stopPropagation in UI Kit), so
+  // the page opens alongside — refresh the detail unconditionally so the
+  // freshly claimed state always wins over the bubble's earlier getEvent.
+  const handleClaimEvent = (event: EventSummary) =>
+    runAction(async () => {
+      await invoke("claimEvent", { eventId: event.id });
+      setMessage({ appearance: "success", text: "You are now the Lunch Boss." });
+      await refreshOutings();
+      await refreshEventDetail(event.id);
+    });
+
+  const handleAbandonEvent = (deleteMyOrder: boolean) => {
+    if (!openedEvent) {
+      return;
+    }
+    return runAction(async () => {
+      const result = unwrap(
+        await invoke<AbandonEventResult>("abandonEvent", {
+          eventId: openedEvent.id,
+          ...(deleteMyOrder ? { deleteMyOrder: true } : {}),
+        }),
+      );
+      // Close the page on both outcomes — an ex-boss lingering on a stale
+      // view could otherwise press Abandon again.
+      setOpenedEvent(null);
+      setEventDetail(null);
+      setMessage({
+        appearance: "information",
+        text: result.outcome === "deleted" ? "Event deleted." : "Bossdom abandoned.",
+      });
+      await refreshOutings();
+    });
+  };
+
+  const handleUpdateEvent = (date: string, time: string, teamIds: number[]) => {
+    if (!openedEvent) {
+      return;
+    }
+    const current = eventDetail ?? openedEvent;
+    const scheduledAt = localDateTimeToUtc(date, time);
+    return runAction(async () => {
+      await invoke("updateEvent", {
+        eventId: openedEvent.id,
+        // An unchanged time is a teams-only edit — the service rejects a
+        // scheduledAt that isn't strictly later, so omit it.
+        ...(scheduledAt !== current.scheduledAt ? { scheduledAt } : {}),
+        teamIds,
+      });
+      setEditEventOpen(false);
+      setMessage({ appearance: "success", text: "Event updated." });
+      await refreshEventDetail(openedEvent.id);
+      await refreshOutings();
+    });
+  };
+
+  const handlePlaceEventOrders = () => {
+    if (!openedEvent) {
+      return;
+    }
+    return runAction(async () => {
+      await invoke("placeEventOrders", { eventId: openedEvent.id });
+      setMessage({ appearance: "success", text: "Orders placed." });
+      // The re-fetch flips the button to "Orders Placed" and shows the
+      // preserved table; losing the race surfaces the service error instead,
+      // and the same re-fetch in the next open shows who won.
+      await refreshEventDetail(openedEvent.id);
+      // The caller's own history gained a row.
+      await refreshOrders();
+      await refreshStats();
+    });
+  };
+
+  const handleCreateOuting = (
+    restaurantId: number,
+    date: string,
+    time: string,
+    teamIds: number[],
+  ) =>
+    runAction(async () => {
+      await invoke<EventSummary>("createEvent", {
+        restaurantId,
+        scheduledAt: localDateTimeToUtc(date, time),
+        teamIds,
+      });
+      setCreateOutingOpen(false);
+      setMessage({ appearance: "success", text: "Event Created." });
+      await refreshOutings();
+    });
+
   // --- Order lifecycle (CONTEXT.md §3.12) ---
   const startSelection = (
     target: SelectionTarget,
@@ -230,19 +572,30 @@ const App = () => {
   };
 
   // The wheel (Custom UI inside a Frame) reports its winner through the
-  // Events API — the documented Frame↔host communication channel.
+  // Events API — the documented Frame↔host communication channel. One shared
+  // channel serves both the solo flow and the create panel; wheelPurposeRef
+  // (read live, hence a ref) decides where each result goes.
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | undefined;
     events
       .on("lunch-boss.wheel-result", (payload?: SelectionTarget) => {
-        if (
+        const winner =
           payload &&
           typeof payload.id === "number" &&
           typeof payload.name === "string"
-        ) {
-          startSelection({ id: payload.id, name: payload.name });
+            ? { id: payload.id, name: payload.name }
+            : null;
+        if (wheelPurposeRef.current === "create-event") {
+          // Route into the create panel; its own state closes the wheel view.
+          if (winner) {
+            setCreateEventWheelWinner(winner);
+          }
+        } else {
+          if (winner) {
+            startSelection(winner);
+          }
+          setWheelOpen(false);
         }
-        setWheelOpen(false);
       })
       .then((sub) => {
         subscription = sub;
@@ -268,6 +621,7 @@ const App = () => {
       return;
     }
     setMessage(null);
+    wheelPurposeRef.current = "solo";
     setWheelOpen(true);
   };
 
@@ -425,6 +779,7 @@ const App = () => {
         <TabList>
           <Tab>Home</Tab>
           <Tab>Restaurants</Tab>
+          <Tab>Teams</Tab>
           <Tab>History</Tab>
         </TabList>
 
@@ -451,11 +806,68 @@ const App = () => {
                 />
               </Stack>
 
+              <OutingsSection
+                events={outings}
+                teams={allTeams}
+                busy={busy}
+                onStartOuting={handleStartOuting}
+                onOpenEvent={handleOpenEvent}
+                onClaimEvent={handleClaimEvent}
+              />
+
               <Stack grow="fill" space="space.150">
                 <Heading as="h2">Stats</Heading>
                 <HomeStats stats={stats} />
               </Stack>
             </Stack>
+
+            <EventDetailModal
+              summary={openedEvent}
+              detail={eventDetail}
+              teams={allTeams}
+              inPool={
+                openedEvent !== null &&
+                (restaurants ?? []).some(
+                  (restaurant) => restaurant.id === openedEvent.restaurantId,
+                )
+              }
+              busy={busy}
+              onClose={handleCloseEvent}
+              onSubmitOrder={handleSubmitEventOrder}
+              onSaveOrder={handleSaveEventOrder}
+              onCancelOrder={handleCancelEventOrder}
+              onPlaceOrders={handlePlaceEventOrders}
+              myAccountId={myAccountId}
+              onAbandon={handleAbandonEvent}
+              onClaim={() => {
+                if (openedEvent) {
+                  handleClaimEvent(openedEvent);
+                }
+              }}
+              onOpenEdit={() => setEditEventOpen(true)}
+            />
+
+            <EditEventModal
+              isOpen={editEventOpen}
+              event={eventDetail ?? openedEvent}
+              teams={myTeams}
+              busy={busy}
+              todayDate={todayLocalDate()}
+              onSave={handleUpdateEvent}
+              onCancel={() => setEditEventOpen(false)}
+            />
+
+            <CreateOutingModal
+              isOpen={createOutingOpen}
+              restaurants={restaurants}
+              teams={myTeams}
+              busy={busy}
+              todayDate={todayLocalDate()}
+              wheelWinner={createEventWheelWinner}
+              onOpenWheel={handleOpenCreateWheel}
+              onCreate={handleCreateOuting}
+              onCancel={() => setCreateOutingOpen(false)}
+            />
           </Box>
         </TabPanel>
 
@@ -499,6 +911,19 @@ const App = () => {
                 onDelete={handleDelete}
               />
             </Stack>
+          </Box>
+        </TabPanel>
+
+        <TabPanel>
+          <Box xcss={tabPanelTopSpacing}>
+            <TeamsPanel
+              myTeams={myTeams}
+              allTeams={allTeams}
+              busy={busy}
+              onCreateOrJoinByName={handleCreateOrJoinByName}
+              onJoin={handleJoinTeam}
+              onLeave={handleLeaveTeam}
+            />
           </Box>
         </TabPanel>
 

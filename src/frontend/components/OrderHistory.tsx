@@ -34,14 +34,23 @@ const head = {
   ],
 };
 
-// MySQL DATETIME arrives as "YYYY-MM-DD HH:MM:SS".
+// ordered_at arrives as a UTC datetime string "YYYY-MM-DD HH:MM:SS" with no
+// zone marker. Append "Z" so it's parsed as UTC, then toLocaleString renders it
+// in the viewer's local timezone (JS would otherwise treat a zone-less string
+// as local and show the raw UTC wall-clock).
 const formatDate = (value: string): string => {
-  const date = new Date(value.replace(" ", "T"));
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  const date = new Date(`${value.replace(" ", "T")}Z`);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
 };
 
-// Local date as YYYY-MM-DD. Note: ordered_at is compared with DATE() in the
-// database's clock (likely UTC), so near midnight "today" may straddle dates.
+// Local date as YYYY-MM-DD for the "Today" shortcut. The parent converts this
+// (and the picker values) to UTC instant bounds before querying, so "today"
+// resolves to the viewer's local day.
 const todayLocal = (): string => {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -94,6 +103,7 @@ const OrderHistory = ({
           <DatePicker
             id="historyFrom"
             defaultValue={from}
+            placeholder={todayLocal()}
             onChange={(value) => onFilterChange(value || undefined, to)}
           />
         </Stack>
@@ -102,6 +112,7 @@ const OrderHistory = ({
           <DatePicker
             id="historyTo"
             defaultValue={to}
+            placeholder={todayLocal()}
             onChange={(value) => onFilterChange(from, value || undefined)}
           />
         </Stack>

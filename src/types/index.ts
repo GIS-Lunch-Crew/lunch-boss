@@ -98,3 +98,112 @@ export type OrderStats = {
     count: number;
   } | null;
 };
+
+// --- Teams (group ordering) ---
+
+export type Team = {
+  id: number;
+  name: string;
+  // Atlassian accountId of whoever created it (attribution only).
+  createdBy: string;
+};
+
+export type CreateTeamInput = {
+  name: string;
+};
+
+// Like addRestaurant, createTeam never fails on an existing (normalized) name:
+// it links the caller to the existing team instead and reports which happened.
+export type CreateTeamOutcome = "created" | "joined-existing";
+
+export type CreateTeamResult = {
+  team: Team;
+  outcome: CreateTeamOutcome;
+};
+
+// --- Outings / events (group ordering) ---
+
+// An outing in the day's list. Times are UTC instants ("YYYY-MM-DD HH:MM:SS"),
+// rendered locally by the frontend. teamIds are the teams the outing targets.
+// hostAccountId is the Lunch Boss (null = up for grabs). placedAt set = the
+// batch was placed.
+export type EventSummary = {
+  id: number;
+  hostAccountId: string | null;
+  createdBy: string;
+  restaurantId: number;
+  restaurantName: string;
+  scheduledAt: string;
+  originalScheduledAt: string;
+  placedAt: string | null;
+  teamIds: number[];
+};
+
+export type CreateEventInput = {
+  restaurantId: number;
+  scheduledAt: string; // UTC instant
+  teamIds: number[]; // ≥1
+};
+
+// Restaurant is fixed at creation, so it's not editable here. scheduledAt may
+// only move later (service-enforced); teamIds must stay ≥1 when provided.
+export type UpdateEventInput = {
+  eventId: number;
+  scheduledAt?: string;
+  teamIds?: number[];
+};
+
+// Half-open UTC instant bounds for the viewer's local "today" (same convention
+// as getOrders — computed client-side).
+export type GetTodaysEventsInput = {
+  from: string;
+  to: string;
+};
+
+// Submitting an order to an event. Unlike solo, the restaurant isn't picked
+// here (it's the event's) and isn't auto-saved to the pool — addToPool is the
+// opt-in toggle (default off).
+export type SubmitEventOrderInput = {
+  eventId: number;
+  items?: string;
+  total?: number;
+  notes?: string;
+  addToPool?: boolean;
+};
+
+// Overwrite semantics like UpdateSubmissionInput: the form sends full state,
+// an omitted field clears the stored one.
+export type UpdateEventOrderInput = {
+  eventId: number;
+  items?: string;
+  total?: number;
+  notes?: string;
+};
+
+// What abandonEvent did: with orders remaining the event goes bossless
+// ("abandoned"); with none it's deleted. The UI refreshes or closes on this.
+export type AbandonEventResult = {
+  outcome: "abandoned" | "deleted";
+};
+
+// One person's in-flight order on an event (event_orders row). Same order
+// shape as CurrentSubmission; the restaurant lives on the event, not the row.
+export type EventOrder = {
+  accountId: string;
+  items: string | null;
+  total: number | null;
+  notes: string | null;
+  submittedAt: string;
+};
+
+// The event-detail page payload: the summary plus the restaurant's contact
+// fields ('' means "not provided", as on Restaurant) and everyone's orders.
+// myOrder is server-computed for the caller (null = hasn't ordered).
+export type EventDetail = EventSummary & {
+  address: string;
+  phone: string;
+  website: string | null;
+  menuUrl: string | null;
+  orders: EventOrder[];
+  myOrder: EventOrder | null;
+};
