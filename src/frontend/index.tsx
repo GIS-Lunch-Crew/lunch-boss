@@ -54,13 +54,18 @@ const OUTCOME_MESSAGES: Record<AddRestaurantResult["outcome"], Message> = {
   },
 };
 
-// "" = omitted; anything unparseable or negative is rejected.
+// Mirrors validation/orderSchemas.ts MAX_TOTAL.
+const MAX_TOTAL = 100000;
+
+// "" = omitted; anything unparseable, negative, or over MAX_TOTAL is rejected.
 const parseTotal = (text: string): number | undefined | "invalid" => {
   if (text.trim() === "") {
     return undefined;
   }
   const value = Number(text);
-  return Number.isNaN(value) || value < 0 ? "invalid" : value;
+  return Number.isNaN(value) || value < 0 || value > MAX_TOTAL
+    ? "invalid"
+    : value;
 };
 
 const App = () => {
@@ -284,7 +289,7 @@ const App = () => {
     if (total === "invalid") {
       setMessage({
         appearance: "error",
-        text: "Total must be a non-negative number.",
+        text: `Total must be a non-negative number under $${MAX_TOTAL.toLocaleString()}.`,
       });
       return;
     }
@@ -316,7 +321,7 @@ const App = () => {
     if (total === "invalid") {
       setMessage({
         appearance: "error",
-        text: "Total must be a non-negative number.",
+        text: `Total must be a non-negative number under $${MAX_TOTAL.toLocaleString()}.`,
       });
       return Promise.resolve(false);
     }

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   Button,
+  ErrorMessage,
   Inline,
   Label,
   Spinner,
@@ -12,6 +13,18 @@ import {
 } from "@forge/react";
 import WheelModal from "./WheelModal";
 import type { CurrentSubmission } from "../../types";
+
+// Mirrors validation/orderSchemas.ts MAX_TOTAL.
+const MAX_TOTAL = 100000;
+
+// "" = omitted; anything unparseable, negative, or over MAX_TOTAL is invalid.
+const isInvalidTotal = (text: string): boolean => {
+  if (text.trim() === "") {
+    return false;
+  }
+  const value = Number(text);
+  return Number.isNaN(value) || value < 0 || value > MAX_TOTAL;
+};
 
 // All the selection stage needs to render — a full Restaurant satisfies it,
 // and so does a history row (which only carries id + name).
@@ -75,9 +88,9 @@ const CurrentOrder = ({
   const [items, setItems] = useState(submission?.items ?? prefill?.items ?? "");
   const [total, setTotal] = useState(
     submission?.total != null
-      ? String(submission.total)
+      ? submission.total.toFixed(2)
       : prefill?.total != null
-        ? String(prefill.total)
+        ? prefill.total.toFixed(2)
         : "",
   );
   const [notes, setNotes] = useState(submission?.notes ?? prefill?.notes ?? "");
@@ -132,9 +145,16 @@ const CurrentOrder = ({
         <Label labelFor="orderTotal">Total $</Label>
         <Textfield
           id="orderTotal"
+          isInvalid={isInvalidTotal(total)}
           defaultValue={total}
           onChange={(event) => setTotal(event.target.value)}
         />
+        {isInvalidTotal(total) && (
+          <ErrorMessage>
+            Total must be a non-negative number under $
+            {MAX_TOTAL.toLocaleString()}.
+          </ErrorMessage>
+        )}
         <Label labelFor="orderNotes">Notes</Label>
         <TextArea
           id="orderNotes"
@@ -144,7 +164,7 @@ const CurrentOrder = ({
         <Inline space="space.100">
           <Button
             appearance="primary"
-            isDisabled={busy}
+            isDisabled={busy || isInvalidTotal(total)}
             onClick={() => onSubmitOrder(items, total, notes)}
           >
             Submit order
@@ -214,9 +234,16 @@ const CurrentOrder = ({
       <Label labelFor="orderTotal">Total $</Label>
       <Textfield
         id="orderTotal"
+        isInvalid={isInvalidTotal(total)}
         defaultValue={total}
         onChange={(event) => setTotal(event.target.value)}
       />
+      {isInvalidTotal(total) && (
+        <ErrorMessage>
+          Total must be a non-negative number under $
+          {MAX_TOTAL.toLocaleString()}.
+        </ErrorMessage>
+      )}
       <Label labelFor="orderNotes">Notes</Label>
       <TextArea
         id="orderNotes"
@@ -226,7 +253,7 @@ const CurrentOrder = ({
       <Inline space="space.100">
         <Button
           appearance="primary"
-          isDisabled={busy}
+          isDisabled={busy || isInvalidTotal(total)}
           onClick={async () => {
             const wasSaved = await onSaveSubmission(items, total, notes);
             if (wasSaved) {
@@ -241,7 +268,9 @@ const CurrentOrder = ({
           isDisabled={busy}
           onClick={() => {
             setItems(submission.items ?? "");
-            setTotal(submission.total != null ? String(submission.total) : "");
+            setTotal(
+              submission.total != null ? submission.total.toFixed(2) : "",
+            );
             setNotes(submission.notes ?? "");
             setEditingDetails(false);
           }}
