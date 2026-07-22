@@ -430,3 +430,32 @@ invites divergent semantics.
 No-order claimers get "Submit an order on this event first, then claim
 bossdom." — the card's always-active Claim button leans on this. UI (cards,
 boss area, Edit Details modal) lands next commit.
+
+### Commit 12 — slice-5 UI: boss area, Claim Bossdom, time-change note, Edit Details
+
+Slice 5, UI half — completes the slice. Cards show a two-line time-change note
+("Original Time:" over the formatted original) whenever the time was edited,
+and a bossless card carries a **Claim Bossdom** button (always active;
+ineligible claimers get the server's guide message). The Event page gains a
+state-based top section: the boss sees "You are currently presiding over this
+Event" with **Abandon Bossdom** (the **Delete My Order** checkbox beneath it,
+shown only when the boss has an order) and **Edit Details** beneath the line;
+everyone sees "The Boss is out of office" + Claim Bossdom when it's up for
+grabs; a non-boss viewing a bossed event sees no top section. All of it
+disables once placed; Edit Details also disables post-time (edits are frozen).
+The Edit Details modal finally homes the slice-2 `updateEvent` backend: date +
+time + teams, seeded from the event, Save rejecting any instant not strictly
+later than both now and the current time — an unchanged time is sent as a
+teams-only edit (the service would reject a non-later `scheduledAt`). The
+team checklist is **strictly the caller's teams** (a takeover boss re-targets
+to their own teams), pre-checked with the event's teams ∩ mine.
+
+| File | Purpose |
+| --- | --- |
+| `src/frontend/components/OutingsSection.tsx` | Card restructured Box-with-inner-`Pressable` (a Button can't nest in a press target): info area opens the page, bossless cards get the Claim button (replacing the "Up for grabs" text); the two-line Original Time note when `originalScheduledAt ≠ scheduledAt`. |
+| `src/frontend/components/EventDetailModal.tsx` | The state-based top section (presiding / out-of-office); `deleteMyOrder` checkbox state, reset per opened event; `myAccountId` prop decides bosshood; `onAbandon` / `onClaim` / `onOpenEdit`. |
+| `src/frontend/components/EditEventModal.tsx` | New. `DatePicker` + `TimePicker` (create-modal patterns: half-hour slots, widths, `minDate`) seeded from the event's local date/time; my-teams `CheckboxGroup` pre-checked; later-only Save gate with an inline "must be later than X" hint; teams-only saves allowed at the unchanged time. |
+| `src/frontend/index.tsx` | `myAccountId` (from the existing `view.getContext()` call), `editEventOpen` state; `handleClaimEvent` (card or page; refreshes strip + open detail), `handleAbandonEvent` (outcome `deleted` → close page + "Event deleted.", `abandoned` → refresh + "Bossdom abandoned."), `handleUpdateEvent` (omits an unchanged `scheduledAt`; "Event updated."). |
+
+Slice 5 complete. Remaining: slice 6 (polish — expandable per-row teams cell,
+optional decline/gray-out, docs).

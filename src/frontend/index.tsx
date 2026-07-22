@@ -26,7 +26,9 @@ import TeamsPanel from "./components/TeamsPanel";
 import OutingsSection from "./components/OutingsSection";
 import CreateOutingModal from "./components/CreateOutingModal";
 import EventDetailModal from "./components/EventDetailModal";
+import EditEventModal from "./components/EditEventModal";
 import type {
+  AbandonEventResult,
   AddRestaurantResult,
   CreateTeamResult,
   CurrentSubmission,
@@ -158,6 +160,11 @@ const App = () => {
   // from getEvent (null = still loading). The summary seeds the instant paint.
   const [openedEvent, setOpenedEvent] = useState<EventSummary | null>(null);
   const [eventDetail, setEventDetail] = useState<EventDetail | null>(null);
+  // The boss's Edit Details modal (over the open event).
+  const [editEventOpen, setEditEventOpen] = useState(false);
+  // The caller's own accountId (view context) — tells the detail page
+  // whether the caller is the event's Lunch Boss. null until loaded.
+  const [myAccountId, setMyAccountId] = useState<string | null>(null);
   // Not persisted; always resets to Home on load.
   const [activeTab, setActiveTab] = useState(0);
 
@@ -229,9 +236,10 @@ const App = () => {
     refreshStats();
     refreshTeams();
     refreshOutings();
-    view
-      .getContext()
-      .then((context) => setEnvironmentType(context.environmentType));
+    view.getContext().then((context) => {
+      setEnvironmentType(context.environmentType);
+      setMyAccountId(context.accountId ?? null);
+    });
     // Cosmetic — on failure just omit the greeting, no error banner.
     requestConfluence("/wiki/rest/api/user/current")
       .then((response) => response.json())
@@ -448,6 +456,62 @@ const App = () => {
       setMessage({ appearance: "information", text: "Order canceled." });
       await refreshEventDetail(openedEvent.id);
       // Losing the order can change strip visibility.
+      await refreshOutings();
+    });
+  };
+
+  // Claim works from a card or the open detail page; the strip always
+  // refreshes, the detail only if it's the open event.
+  const handleClaimEvent = (event: EventSummary) =>
+    runAction(async () => {
+      await invoke("claimEvent", { eventId: event.id });
+      setMessage({ appearance: "success", text: "You are now the Lunch Boss." });
+      await refreshOutings();
+      if (openedEvent?.id === event.id) {
+        await refreshEventDetail(event.id);
+      }
+    });
+
+  const handleAbandonEvent = (deleteMyOrder: boolean) => {
+    if (!openedEvent) {
+      return;
+    }
+    return runAction(async () => {
+      const result = unwrap(
+        await invoke<AbandonEventResult>("abandonEvent", {
+          eventId: openedEvent.id,
+          ...(deleteMyOrder ? { deleteMyOrder: true } : {}),
+        }),
+      );
+      // Close the page on both outcomes — an ex-boss lingering on a stale
+      // view could otherwise press Abandon again.
+      setOpenedEvent(null);
+      setEventDetail(null);
+      setMessage({
+        appearance: "information",
+        text: result.outcome === "deleted" ? "Event deleted." : "Bossdom abandoned.",
+      });
+      await refreshOutings();
+    });
+  };
+
+  const handleUpdateEvent = (date: string, time: string, teamIds: number[]) => {
+    if (!openedEvent) {
+      return;
+    }
+    const current = eventDetail ?? openedEvent;
+    const scheduledAt = localDateTimeToUtc(date, time);
+    return runAction(async () => {
+      await invoke("updateEvent", {
+        eventId: openedEvent.id,
+        // An unchanged time is a teams-only edit — the service rejects a
+        // scheduledAt that isn't strictly later, so omit it.
+        ...(scheduledAt !== current.scheduledAt ? { scheduledAt } : {}),
+        teamIds,
+      });
+      setEditEventOpen(false);
+      setMessage({ appearance: "success", text: "Event updated." });
+      await refreshEventDetail(openedEvent.id);
       await refreshOutings();
     });
   };
@@ -743,6 +807,7 @@ const App = () => {
                 busy={busy}
                 onStartOuting={handleStartOuting}
                 onOpenEvent={handleOpenEvent}
+                onClaimEvent={handleClaimEvent}
               />
 
               <Stack grow="fill" space="space.150">
@@ -767,6 +832,24 @@ const App = () => {
               onSaveOrder={handleSaveEventOrder}
               onCancelOrder={handleCancelEventOrder}
               onPlaceOrders={handlePlaceEventOrders}
+              myAccountId={myAccountId}
+              onAbandon={handleAbandonEvent}
+              onClaim={() => {
+                if (openedEvent) {
+                  handleClaimEvent(openedEvent);
+                }
+              }}
+              onOpenEdit={() => setEditEventOpen(true)}
+            />
+
+            <EditEventModal
+              isOpen={editEventOpen}
+              event={eventDetail ?? openedEvent}
+              teams={myTeams}
+              busy={busy}
+              todayDate={todayLocalDate()}
+              onSave={handleUpdateEvent}
+              onCancel={() => setEditEventOpen(false)}
             />
 
             <CreateOutingModal

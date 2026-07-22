@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Button,
+  Checkbox,
   DynamicTable,
   Heading,
   Icon,
@@ -48,6 +49,12 @@ type Props = {
   ) => Promise<boolean>;
   onCancelOrder: () => void;
   onPlaceOrders: () => void;
+  // The caller's accountId (from the view context; null until it loads) —
+  // decides whether the top section shows the presiding or out-of-office view.
+  myAccountId: string | null;
+  onAbandon: (deleteMyOrder: boolean) => void;
+  onClaim: () => void;
+  onOpenEdit: () => void;
 };
 
 // Stored UTC instant ("YYYY-MM-DD HH:MM:SS") → the viewer's local time, to the
@@ -81,7 +88,19 @@ const EventDetailModal = ({
   onSaveOrder,
   onCancelOrder,
   onPlaceOrders,
+  myAccountId,
+  onAbandon,
+  onClaim,
+  onOpenEdit,
 }: Props) => {
+  // The Abandon Bossdom checkbox ("Delete My Order"). Reset whenever a
+  // different event opens — the modal component stays mounted across opens.
+  const [deleteMyOrder, setDeleteMyOrder] = useState(false);
+  const summaryId = summary?.id;
+  useEffect(() => {
+    setDeleteMyOrder(false);
+  }, [summaryId]);
+
   if (summary === null) {
     return <ModalTransition>{null}</ModalTransition>;
   }
@@ -92,6 +111,8 @@ const EventDetailModal = ({
   const teamIds = detail?.teamIds ?? summary.teamIds;
   const scheduledAt = detail?.scheduledAt ?? summary.scheduledAt;
   const placedAt = detail?.placedAt ?? summary.placedAt;
+  const hostAccountId = detail?.hostAccountId ?? summary.hostAccountId;
+  const isBoss = myAccountId !== null && hostAccountId === myAccountId;
 
   // Place All Orders: enabled only after the event's time AND for someone
   // with a submitted order on it; once placed it stays disabled and reads
@@ -127,6 +148,53 @@ const EventDetailModal = ({
         </ModalHeader>
         <ModalBody>
           <Stack space="space.300">
+            {/* State-based top line: presiding boss / out-of-office. A
+                non-boss viewing a bossed event sees no top section. Buttons
+                disable once placed — placed is terminal (and the DB's
+                conditional writes arbitrate any race). */}
+            {isBoss && (
+              <Inline spread="space-between" alignBlock="start">
+                <Stack space="space.100">
+                  <Text>You are currently presiding over this Event</Text>
+                  <Inline>
+                    <Button
+                      isDisabled={busy || placed || timePassed}
+                      onClick={onOpenEdit}
+                    >
+                      Edit Details
+                    </Button>
+                  </Inline>
+                </Stack>
+                <Stack space="space.050" alignInline="end">
+                  <Button
+                    isDisabled={busy || placed}
+                    onClick={() => onAbandon(deleteMyOrder)}
+                  >
+                    Abandon Bossdom
+                  </Button>
+                  {detail?.myOrder && (
+                    <Checkbox
+                      label="Delete My Order"
+                      isChecked={deleteMyOrder}
+                      isDisabled={busy || placed}
+                      onChange={() => setDeleteMyOrder((value) => !value)}
+                    />
+                  )}
+                </Stack>
+              </Inline>
+            )}
+            {hostAccountId === null && (
+              <Inline spread="space-between" alignBlock="center">
+                <Text>The Boss is out of office</Text>
+                <Button
+                  isDisabled={busy || placed}
+                  onClick={onClaim}
+                >
+                  Claim Bossdom
+                </Button>
+              </Inline>
+            )}
+
             {detail === null ? (
               <Spinner label="Loading event" />
             ) : (
