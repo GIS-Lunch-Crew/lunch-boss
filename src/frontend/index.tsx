@@ -427,7 +427,7 @@ const App = () => {
           <Box xcss={tabPanelTopSpacing}>
             <Stack grow="fill" space="space.300">
               <Stack grow="fill" space="space.150">
-                <Heading as="h2">Current order</Heading>
+                <Heading as="h2">Current Order</Heading>
                 <CurrentOrder
                   key={orderKey}
                   submission={submission}
@@ -458,7 +458,7 @@ const App = () => {
           <Box xcss={tabPanelTopSpacing}>
             <Stack grow="fill" space="space.300">
               <Stack grow="fill" space="space.150">
-                <Heading as="h2">My restaurant pool</Heading>
+                <Heading as="h2">My Restaurant Pool</Heading>
                 <RestaurantTable
                   restaurants={restaurants}
                   busy={busy}
@@ -500,7 +500,7 @@ const App = () => {
         <TabPanel>
           <Box xcss={tabPanelTopSpacing}>
             <Stack grow="fill" space="space.150">
-              <Heading as="h2">Order history</Heading>
+              <Heading as="h2">Order History</Heading>
               <OrderHistory
                 key={`history-${orderFilter.from ?? ""}-${orderFilter.to ?? ""}`}
                 orders={orders}
