@@ -31,3 +31,20 @@ export const getTodaysEventsSchema = z.object({
 export const eventIdSchema = z.object({
   eventId: z.number().int().positive(),
 });
+
+// Order-detail shapes mirror the solo submitOrderSchema; the restaurant is the
+// event's, so no restaurantId here. addToPool is the pool opt-in (default off).
+export const submitEventOrderSchema = z.object({
+  eventId: z.number().int().positive(),
+  items: z.string().trim().max(2000).optional(),
+  total: z.number().nonnegative().optional(),
+  notes: z.string().trim().max(1000).optional(),
+  addToPool: z.boolean().optional(),
+});
+
+export const updateEventOrderSchema = z.object({
+  eventId: z.number().int().positive(),
+  items: z.string().trim().max(2000).optional(),
+  total: z.number().nonnegative().optional(),
+  notes: z.string().trim().max(1000).optional(),
+});

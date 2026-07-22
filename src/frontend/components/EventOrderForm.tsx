@@ -20,6 +20,18 @@ type Props = {
   // hides the opt-in toggle (nothing to add).
   inPool: boolean;
   busy: boolean;
+  onSubmitOrder: (
+    itemsText: string,
+    totalText: string,
+    notesText: string,
+    addToPool: boolean,
+  ) => void;
+  onSaveOrder: (
+    itemsText: string,
+    totalText: string,
+    notesText: string,
+  ) => Promise<boolean>;
+  onCancelOrder: () => void;
 };
 
 // The order form on the Event-detail page — a visual clone of the solo
@@ -28,10 +40,15 @@ type Props = {
 // placement is the table's job). Unlike solo, submitting here does NOT
 // auto-save the restaurant to your pool — the "Add to Your Pool" toggle is the
 // opt-in (default off), shown only when it isn't already in your pool.
-//
-// Events slice: every control renders but is inert — nothing writes. The
-// Orders slice wires submit/edit/cancel + the pool opt-in.
-const EventOrderForm = ({ myOrder, restaurantName, inPool, busy }: Props) => {
+const EventOrderForm = ({
+  myOrder,
+  restaurantName,
+  inPool,
+  busy,
+  onSubmitOrder,
+  onSaveOrder,
+  onCancelOrder,
+}: Props) => {
   const [items, setItems] = useState(myOrder?.items ?? "");
   const [total, setTotal] = useState(
     myOrder?.total != null ? String(myOrder.total) : "",
@@ -84,8 +101,11 @@ const EventOrderForm = ({ myOrder, restaurantName, inPool, busy }: Props) => {
           </Inline>
         )}
         <Inline space="space.100">
-          {/* Inert until the Orders slice wires submitEventOrder. */}
-          <Button appearance="primary" isDisabled={busy} onClick={() => {}}>
+          <Button
+            appearance="primary"
+            isDisabled={busy}
+            onClick={() => onSubmitOrder(items, total, notes, addToPool)}
+          >
             Submit order
           </Button>
         </Inline>
@@ -110,8 +130,7 @@ const EventOrderForm = ({ myOrder, restaurantName, inPool, busy }: Props) => {
           <Button isDisabled={busy} onClick={() => setEditingDetails(true)}>
             Edit order
           </Button>
-          {/* Inert until the Orders slice wires cancelEventOrder. */}
-          <Button appearance="subtle" isDisabled={busy} onClick={() => {}}>
+          <Button appearance="subtle" isDisabled={busy} onClick={onCancelOrder}>
             Cancel order
           </Button>
         </Inline>
@@ -128,8 +147,16 @@ const EventOrderForm = ({ myOrder, restaurantName, inPool, busy }: Props) => {
       </Text>
       {fields}
       <Inline space="space.100">
-        {/* Inert until the Orders slice wires updateEventOrder. */}
-        <Button appearance="primary" isDisabled={busy} onClick={() => {}}>
+        <Button
+          appearance="primary"
+          isDisabled={busy}
+          onClick={async () => {
+            const wasSaved = await onSaveOrder(items, total, notes);
+            if (wasSaved) {
+              setEditingDetails(false);
+            }
+          }}
+        >
           Save changes
         </Button>
         <Button

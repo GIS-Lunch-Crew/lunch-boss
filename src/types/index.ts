@@ -160,6 +160,26 @@ export type GetTodaysEventsInput = {
   to: string;
 };
 
+// Submitting an order to an event. Unlike solo, the restaurant isn't picked
+// here (it's the event's) and isn't auto-saved to the pool — addToPool is the
+// opt-in toggle (default off).
+export type SubmitEventOrderInput = {
+  eventId: number;
+  items?: string;
+  total?: number;
+  notes?: string;
+  addToPool?: boolean;
+};
+
+// Overwrite semantics like UpdateSubmissionInput: the form sends full state,
+// an omitted field clears the stored one.
+export type UpdateEventOrderInput = {
+  eventId: number;
+  items?: string;
+  total?: number;
+  notes?: string;
+};
+
 // One person's in-flight order on an event (event_orders row). Same order
 // shape as CurrentSubmission; the restaurant lives on the event, not the row.
 export type EventOrder = {

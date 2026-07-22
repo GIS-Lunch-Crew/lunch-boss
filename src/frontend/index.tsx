@@ -32,6 +32,7 @@ import type {
   CurrentSubmission,
   CurrentSubmissionResult,
   EventDetail,
+  EventOrder,
   EventSummary,
   OrderStats,
   PlacedOrder,
@@ -367,6 +368,90 @@ const App = () => {
     setEventDetail(null);
   };
 
+  // Re-fetch the open event after a write so the detail view (form state,
+  // orders table) reflects it.
+  const refreshEventDetail = async (eventId: number) => {
+    setEventDetail(unwrap(await invoke<EventDetail>("getEvent", { eventId })));
+  };
+
+  const handleSubmitEventOrder = (
+    itemsText: string,
+    totalText: string,
+    notesText: string,
+    addToPool: boolean,
+  ) => {
+    if (!openedEvent) {
+      return;
+    }
+    const total = parseTotal(totalText);
+    if (total === "invalid") {
+      setMessage({
+        appearance: "error",
+        text: "Total must be a non-negative number.",
+      });
+      return;
+    }
+    return runAction(async () => {
+      await invoke<EventOrder>("submitEventOrder", {
+        eventId: openedEvent.id,
+        ...(itemsText.trim() !== "" ? { items: itemsText } : {}),
+        ...(total !== undefined ? { total } : {}),
+        ...(notesText.trim() !== "" ? { notes: notesText } : {}),
+        ...(addToPool ? { addToPool: true } : {}),
+      });
+      setMessage({ appearance: "success", text: "Order submitted." });
+      await refreshEventDetail(openedEvent.id);
+      // The submit may have added to the pool (opt-in) or resurrected a
+      // deleted restaurant server-side; the order also counts toward strip
+      // visibility.
+      if (addToPool) {
+        await refresh();
+      }
+      await refreshOutings();
+    });
+  };
+
+  const handleSaveEventOrder = (
+    itemsText: string,
+    totalText: string,
+    notesText: string,
+  ): Promise<boolean> => {
+    if (!openedEvent) {
+      return Promise.resolve(false);
+    }
+    const total = parseTotal(totalText);
+    if (total === "invalid") {
+      setMessage({
+        appearance: "error",
+        text: "Total must be a non-negative number.",
+      });
+      return Promise.resolve(false);
+    }
+    return runAction(async () => {
+      await invoke("updateEventOrder", {
+        eventId: openedEvent.id,
+        ...(itemsText.trim() !== "" ? { items: itemsText } : {}),
+        ...(total !== undefined ? { total } : {}),
+        ...(notesText.trim() !== "" ? { notes: notesText } : {}),
+      });
+      setMessage({ appearance: "success", text: "Order updated." });
+      await refreshEventDetail(openedEvent.id);
+    });
+  };
+
+  const handleCancelEventOrder = () => {
+    if (!openedEvent) {
+      return;
+    }
+    return runAction(async () => {
+      await invoke("cancelEventOrder", { eventId: openedEvent.id });
+      setMessage({ appearance: "information", text: "Order canceled." });
+      await refreshEventDetail(openedEvent.id);
+      // Losing the order can change strip visibility.
+      await refreshOutings();
+    });
+  };
+
   const handleCreateOuting = (
     restaurantId: number,
     date: string,
@@ -661,6 +746,9 @@ const App = () => {
               }
               busy={busy}
               onClose={handleCloseEvent}
+              onSubmitOrder={handleSubmitEventOrder}
+              onSaveOrder={handleSaveEventOrder}
+              onCancelOrder={handleCancelEventOrder}
             />
 
             <CreateOutingModal

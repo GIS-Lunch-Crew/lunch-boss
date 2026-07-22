@@ -322,3 +322,55 @@ the 9 backend strings that leaked "outing" to users via error banners
 A definitive sweep confirms the only remaining "outing" occurrences are
 internal identifiers (component/file names, element ids, the `outings` state),
 never user-visible text.
+
+### Commit 8 — Event-detail page UI (all controls rendered, inert)
+
+Events-slice UI half. Clicking a card on the Today's Events strip opens a
+page-sized Event-detail modal: the caller's order form (a clone of the solo
+stages — restaurant fixed to the event's, no re-pick, no Place); restaurant +
+time large, team names beneath; labeled address / website / menu / phone; and
+the table of everyone's orders with **Place All Orders** at its top (disabled
+before the event's time; enabled after only for a caller with a submitted
+order; once placed, disabled reading "Orders Placed" — the preserved state).
+Everything write-shaped is inert: Submit / Cancel order / Save changes / Place
+All Orders render with the real enable logic but no-op until the Orders slice.
+"Add to Your Pool" (`Toggle`, default off) shows only when the event's
+restaurant isn't already in the caller's pool — a client-side check against
+the loaded pool, no new query.
+
+| File | Purpose |
+| --- | --- |
+| `src/frontend/components/EventOrderForm.tsx` | New. The solo `CurrentOrder` stages (form → submitted read-only → editing) for an event order; "Add to Your Pool" toggle; Edit/Cancel on a submitted order (no Place). |
+| `src/frontend/components/EventDetailModal.tsx` | New. The page-sized (`width="x-large"`) detail modal in the layout above; seeds an instant paint from the card's `EventSummary`, then `getEvent` fills contact fields + the `DynamicTable` of orders (person via `User`). |
+| `src/frontend/components/OutingsSection.tsx` | Cards become `Pressable` (same styling) → `onOpenEvent`. |
+| `src/frontend/index.tsx` | `openedEvent` (the clicked summary) + `eventDetail` state; `handleOpenEvent` invokes `getEvent` (on failure: error banner, close, refresh the strip); passes `inPool` computed from the loaded pool. |
+
+### Commit 9 — event orders wired: submit / edit / cancel (+ resurrect, pool opt-in)
+
+Orders-slice commit 1 of 2: the `event_orders` writes, wired end to end into
+the commit-8 form. All three service functions start from `findDetailById`, so
+the `getEvent` visibility rule also gates writes — a crafted invoke against a
+hidden event reads "Event not found." Once the event's time passes, the order
+set is frozen (no submit/edit/cancel; placement — next commit — is the only
+post-time action). Submitting resurrects a soft-deleted restaurant (the race
+deferred from `createEvent`, mirroring solo `submitOrder`) but does **not**
+auto-save it to the pool — `addToPool` is the opt-in. One order per person per
+event: a friendly service guard, with the `(event_id, account_id)` PK as the
+real enforcement. Also fixes a latent commit-7 bug: `listByEvent` now maps
+DECIMAL `total` string → number (as `submissionRepository` does) — previously
+unreachable with an empty table, it would have crashed `toFixed` on the first
+real row.
+
+| File | Purpose |
+| --- | --- |
+| `src/types/index.ts` | `SubmitEventOrderInput` (order fields + `addToPool?`), `UpdateEventOrderInput` (overwrite semantics, like `UpdateSubmissionInput`). |
+| `src/validation/eventSchemas.ts` | `submitEventOrderSchema`, `updateEventOrderSchema` — order-field shapes copied from the solo `submitOrderSchema`; cancel reuses `eventIdSchema`. |
+| `src/storage/eventOrderRepository.ts` | `findByEventAndAccount`, `insert`, `updateDetails`, `remove`; shared `SELECT_FIELDS` + the DECIMAL `total` mapping fix. |
+| `src/services/eventService.ts` | `submitEventOrder` (visibility → not-past → no-existing-order → resurrect-if-deleted → opt-in pool save → insert → return created), `updateEventOrder` (own order, not past, overwrite), `cancelEventOrder` (own order, not past, delete). |
+| `src/resolvers/events.ts` | `submitEventOrder`, `updateEventOrder`, `cancelEventOrder`. |
+| `src/frontend/components/EventOrderForm.tsx` | The three inert buttons take real handlers (`onSubmitOrder` / `onSaveOrder` — stay-in-edit on failure, like solo — / `onCancelOrder`). |
+| `src/frontend/components/EventDetailModal.tsx` | Passes the handlers through; remounts the form via a `myOrder`-contents key (the `orderKey` trick) so fields reflect each write. |
+| `src/frontend/index.tsx` | Three handlers via `runAction` (reusing `parseTotal` + omit-empty-fields); each re-fetches the open event; submit also refreshes the pool when `addToPool` and the strip (an order affects visibility); cancel refreshes the strip. Messages: "Order submitted." / "Order updated." / "Order canceled." |
+
+Place All Orders remains inert — next commit: `orders.event_id` (v012),
+first-placer-wins placement, and wiring that one button.

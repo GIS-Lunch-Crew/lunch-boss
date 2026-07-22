@@ -35,6 +35,18 @@ type Props = {
   inPool: boolean;
   busy: boolean;
   onClose: () => void;
+  onSubmitOrder: (
+    itemsText: string,
+    totalText: string,
+    notesText: string,
+    addToPool: boolean,
+  ) => void;
+  onSaveOrder: (
+    itemsText: string,
+    totalText: string,
+    notesText: string,
+  ) => Promise<boolean>;
+  onCancelOrder: () => void;
 };
 
 // Stored UTC instant ("YYYY-MM-DD HH:MM:SS") → the viewer's local time, to the
@@ -56,8 +68,8 @@ const toMs = (instant: string): number =>
 // form; restaurant + time (large); team names; the restaurant's contact
 // fields; the table of everyone's orders with Place All Orders at its top.
 //
-// Events slice: everything renders, nothing writes. The Orders slice wires
-// the form and placement.
+// The order form is wired (submit/edit/cancel); Place All Orders is still
+// inert until the placement commit.
 const EventDetailModal = ({
   summary,
   detail,
@@ -65,6 +77,9 @@ const EventDetailModal = ({
   inPool,
   busy,
   onClose,
+  onSubmitOrder,
+  onSaveOrder,
+  onCancelOrder,
 }: Props) => {
   if (summary === null) {
     return <ModalTransition>{null}</ModalTransition>;
@@ -115,10 +130,21 @@ const EventDetailModal = ({
               <Spinner label="Loading event" />
             ) : (
               <EventOrderForm
+                // Field state is local, read on mount — remount whenever the
+                // caller's order changes so a write's result shows (same trick
+                // as index.tsx's orderKey).
+                key={
+                  detail.myOrder
+                    ? `my-${detail.myOrder.items ?? ""}-${detail.myOrder.total ?? ""}-${detail.myOrder.notes ?? ""}`
+                    : "none"
+                }
                 myOrder={detail.myOrder}
                 restaurantName={summary.restaurantName}
                 inPool={inPool}
                 busy={busy}
+                onSubmitOrder={onSubmitOrder}
+                onSaveOrder={onSaveOrder}
+                onCancelOrder={onCancelOrder}
               />
             )}
 
