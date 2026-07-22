@@ -15,6 +15,9 @@ type Props = {
   // True while a submitted order exists — the restaurant is locked, so
   // starting a new selection is not allowed (CONTEXT.md §3.12).
   selectionDisabled: boolean;
+  // The restaurant backing the current in-progress order, whether still
+  // selecting or already submitted (CONTEXT.md §3.12).
+  selectedRestaurantId: number | null;
   onSelect: (restaurant: Restaurant) => void;
   onEdit: (restaurant: Restaurant) => void;
   onRemove: (restaurantId: number) => void;
@@ -33,10 +36,15 @@ const RestaurantTable = ({
   restaurants,
   busy,
   selectionDisabled,
+  selectedRestaurantId,
   onSelect,
   onEdit,
   onRemove,
 }: Props) => {
+  const highlightedRowIndex = (restaurants ?? []).findIndex(
+    (restaurant) => restaurant.id === selectedRestaurantId,
+  );
+
   const rows = (restaurants ?? []).map((restaurant) => ({
     key: String(restaurant.id),
     cells: [
@@ -49,6 +57,7 @@ const RestaurantTable = ({
         key: "address",
         content: restaurant.address === "" ? "N/A" : restaurant.address,
       },
+      // --- Row actions ---
       {
         key: "actions",
         content: (
@@ -56,6 +65,7 @@ const RestaurantTable = ({
             <Button
               appearance="subtle"
               isDisabled={busy || selectionDisabled}
+              isSelected={restaurant.id === selectedRestaurantId}
               onClick={() => onSelect(restaurant)}
             >
               Select
@@ -87,7 +97,13 @@ const RestaurantTable = ({
       ) : restaurants.length === 0 ? (
         <Text>No restaurants exist yet. Add one above.</Text>
       ) : (
-        <DynamicTable head={head} rows={rows} />
+        <DynamicTable
+          head={head}
+          rows={rows}
+          highlightedRowIndex={
+            highlightedRowIndex === -1 ? undefined : highlightedRowIndex
+          }
+        />
       )}
     </Stack>
   );

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import ForgeReconciler, {
+  Box,
   Button,
   Heading,
   Inline,
@@ -10,6 +11,7 @@ import ForgeReconciler, {
   TabPanel,
   Tabs,
   Text,
+  xcss,
 } from "@forge/react";
 import { events, invoke, requestConfluence, view } from "@forge/bridge";
 import { describeError, unwrap } from "./lib/invoke";
@@ -33,6 +35,8 @@ type Message = {
   appearance: "success" | "information" | "error";
   text: string;
 };
+
+const tabPanelTopSpacing = xcss({ paddingTop: "space.200" });
 
 // User-facing text for each addRestaurant outcome (CONTEXT.md §3.10).
 const OUTCOME_MESSAGES: Record<AddRestaurantResult["outcome"], Message> = {
@@ -94,6 +98,7 @@ const App = () => {
   // Not persisted; always resets to Home on load.
   const [activeTab, setActiveTab] = useState(0);
 
+  // --- Data fetching ---
   const refresh = useCallback(async () => {
     try {
       setRestaurants(unwrap(await invoke<Restaurant[]>("getSavedRestaurants")));
@@ -155,21 +160,23 @@ const App = () => {
     refreshOrders();
   }, [refreshOrders]);
 
+  // --- Shared action wrapper ---
   // Wraps a mutation handler with the shared busy/message bookkeeping.
   const runAction = async (action: () => Promise<void>) => {
     setBusy(true);
     setMessage(null);
     try {
       await action();
+      return true;
     } catch (error) {
       setMessage({ appearance: "error", text: describeError(error) });
+      return false;
     } finally {
       setBusy(false);
     }
   };
 
   // --- Restaurant pool ---
-
   const handleRestaurantSubmit = (fields: RestaurantFields) =>
     runAction(async () => {
       if (editing) {
@@ -202,7 +209,6 @@ const App = () => {
     });
 
   // --- Order lifecycle (CONTEXT.md §3.12) ---
-
   const startSelection = (
     target: SelectionTarget,
     withPrefill?: OrderPrefill,
@@ -312,7 +318,7 @@ const App = () => {
         appearance: "error",
         text: "Total must be a non-negative number.",
       });
-      return;
+      return Promise.resolve(false);
     }
     return runAction(async () => {
       await invoke("updateSubmission", {
@@ -367,6 +373,7 @@ const App = () => {
       await refreshSubmission();
     });
 
+  // --- Render ---
   // Remount keys: components hold their field state locally and re-read
   // initial values only on mount, so the key encodes the lifecycle stage.
   const orderKey =
@@ -417,86 +424,95 @@ const App = () => {
         </TabList>
 
         <TabPanel>
-          <Stack grow="fill" space="space.300">
-            <Stack grow="fill" space="space.150">
-              <Heading as="h2">Current order</Heading>
-              <CurrentOrder
-                key={orderKey}
-                submission={submission}
-                selected={selected}
-                prefill={prefill}
-                busy={busy}
-                poolEmpty={(restaurants ?? []).length === 0}
-                wheelOpen={wheelOpen}
-                onCancelWheel={() => setWheelOpen(false)}
-                onPickRandom={pickRandom}
-                onCancelSelection={cancelSelection}
-                onSubmitOrder={handleSubmitOrder}
-                onSaveSubmission={handleSaveSubmission}
-                onClearSubmission={handleClearSubmission}
-                onPlaceOrder={handlePlaceOrder}
-              />
-            </Stack>
+          <Box xcss={tabPanelTopSpacing}>
+            <Stack grow="fill" space="space.300">
+              <Stack grow="fill" space="space.150">
+                <Heading as="h2">Current order</Heading>
+                <CurrentOrder
+                  key={orderKey}
+                  submission={submission}
+                  selected={selected}
+                  prefill={prefill}
+                  busy={busy}
+                  poolEmpty={(restaurants ?? []).length === 0}
+                  wheelOpen={wheelOpen}
+                  onCancelWheel={() => setWheelOpen(false)}
+                  onPickRandom={pickRandom}
+                  onCancelSelection={cancelSelection}
+                  onSubmitOrder={handleSubmitOrder}
+                  onSaveSubmission={handleSaveSubmission}
+                  onClearSubmission={handleClearSubmission}
+                  onPlaceOrder={handlePlaceOrder}
+                />
+              </Stack>
 
-            <Stack grow="fill" space="space.150">
-              <Heading as="h2">Stats</Heading>
-              <HomeStats stats={stats} />
+              <Stack grow="fill" space="space.150">
+                <Heading as="h2">Stats</Heading>
+                <HomeStats stats={stats} />
+              </Stack>
             </Stack>
-          </Stack>
+          </Box>
         </TabPanel>
 
         <TabPanel>
-          <Stack grow="fill" space="space.300">
-            <Stack grow="fill" space="space.150">
-              <Heading as="h2">My restaurant pool</Heading>
-              <RestaurantTable
-                restaurants={restaurants}
-                busy={busy}
-                selectionDisabled={submission != null}
-                onSelect={startSelection}
-                onEdit={(restaurant) => {
-                  setMessage(null);
-                  setEditing(restaurant);
-                }}
-                onRemove={handleRemove}
-              />
-              <Inline>
-                <Button
-                  appearance="primary"
-                  isDisabled={busy}
-                  onClick={() => setAddModalOpen(true)}
-                >
-                  Add restaurant
-                </Button>
-              </Inline>
-            </Stack>
+          <Box xcss={tabPanelTopSpacing}>
+            <Stack grow="fill" space="space.300">
+              <Stack grow="fill" space="space.150">
+                <Heading as="h2">My restaurant pool</Heading>
+                <RestaurantTable
+                  restaurants={restaurants}
+                  busy={busy}
+                  selectionDisabled={submission != null}
+                  selectedRestaurantId={
+                    selected?.id ?? submission?.restaurantId ?? null
+                  }
+                  onSelect={startSelection}
+                  onEdit={(restaurant) => {
+                    setMessage(null);
+                    setEditing(restaurant);
+                  }}
+                  onRemove={handleRemove}
+                />
+                <Inline>
+                  <Button
+                    appearance="primary"
+                    isDisabled={busy}
+                    onClick={() => setAddModalOpen(true)}
+                  >
+                    Add restaurant
+                  </Button>
+                </Inline>
+              </Stack>
 
-            <RestaurantFormModal
-              key={restaurantFormKey}
-              isOpen={restaurantModalOpen}
-              editing={editing}
-              busy={busy}
-              onSubmit={handleRestaurantSubmit}
-              onCancel={closeRestaurantModal}
-              onDelete={handleDelete}
-            />
-          </Stack>
+              <RestaurantFormModal
+                key={restaurantFormKey}
+                isOpen={restaurantModalOpen}
+                editing={editing}
+                busy={busy}
+                onSubmit={handleRestaurantSubmit}
+                onCancel={closeRestaurantModal}
+                onDelete={handleDelete}
+              />
+            </Stack>
+          </Box>
         </TabPanel>
 
         <TabPanel>
-          <Stack grow="fill" space="space.150">
-            <Heading as="h2">Order history</Heading>
-            <OrderHistory
-              key={`history-${orderFilter.from ?? ""}-${orderFilter.to ?? ""}`}
-              orders={orders}
-              from={orderFilter.from}
-              to={orderFilter.to}
-              busy={busy}
-              reorderDisabled={submission != null}
-              onFilterChange={(from, to) => setOrderFilter({ from, to })}
-              onReorder={handleReorder}
-            />
-          </Stack>
+          <Box xcss={tabPanelTopSpacing}>
+            <Stack grow="fill" space="space.150">
+              <Heading as="h2">Order history</Heading>
+              <OrderHistory
+                key={`history-${orderFilter.from ?? ""}-${orderFilter.to ?? ""}`}
+                orders={orders}
+                from={orderFilter.from}
+                to={orderFilter.to}
+                busy={busy}
+                reorderDisabled={submission != null}
+                onFilterChange={(from, to) => setOrderFilter({ from, to })}
+                onReorder={handleReorder}
+              />
+            </Stack>
+          </Box>
         </TabPanel>
       </Tabs>
     </Stack>

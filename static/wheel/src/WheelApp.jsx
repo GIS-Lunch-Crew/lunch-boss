@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { events, invoke } from "@forge/bridge";
+import { events, invoke, view } from "@forge/bridge";
 import Wheel from "./components/Wheel.jsx";
 import "./styles/app.css";
 
@@ -22,6 +22,20 @@ const WheelApp = () => {
         setRestaurants(rows.map(({ id, name }) => ({ id, name })));
       })
       .catch(() => setRestaurants([]));
+  }, []);
+
+  useEffect(() => {
+    // Custom UI runs in its own iframe/bridge, so it must read the host's
+    // theme itself; Frame has no prop to pass it down from the UI Kit host.
+    view
+      .getContext()
+      .then((context) => {
+        const colorMode = context?.theme?.colorMode === "dark" ? "dark" : "light";
+        document.documentElement.setAttribute("data-color-mode", colorMode);
+      })
+      .catch(() => {
+        document.documentElement.setAttribute("data-color-mode", "light");
+      });
   }, []);
 
   const handleSpinComplete = (winner) => {

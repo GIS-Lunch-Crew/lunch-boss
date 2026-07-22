@@ -26,13 +26,25 @@
   box-sizing: border-box;
 }
 
-/* This app renders inside a UI Kit <Frame> iframe on the Confluence page —
-   the body stays transparent so the wheel blends into the host page instead
-   of sitting on his app's dark background. */
+/* This app renders inside a UI Kit <Frame> iframe on the Confluence page.
+   Background starts transparent to avoid a flash before WheelApp reads the
+   host's theme via view.getContext() and sets data-color-mode below. */
+html,
 body {
   margin: 0;
   background: transparent;
   font-family: var(--font-body);
+}
+
+[data-color-mode="dark"] {
+  /* #1f1f21 is Confluence's actual dark surface color (Atlaskit --ds-surface,
+     confirmed via computed style); var() falls back to it if Forge doesn't
+     inject the token into this iframe. */
+  background: var(--ds-surface, #1f1f21);
+}
+
+[data-color-mode="light"] {
+  background: var(--ds-surface, #fff);
 }
 
 button {

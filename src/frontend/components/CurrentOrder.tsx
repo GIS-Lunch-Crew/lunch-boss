@@ -50,7 +50,7 @@ type Props = {
     itemsText: string,
     totalText: string,
     notesText: string,
-  ) => Promise<void> | void;
+  ) => Promise<boolean>;
   onClearSubmission: () => void;
   onPlaceOrder: () => void;
 };
@@ -84,6 +84,7 @@ const CurrentOrder = ({
   // Submitted orders are read-only until the user explicitly edits them.
   const [editingDetails, setEditingDetails] = useState(false);
 
+  // --- Stage: loading ---
   if (submission === undefined) {
     return <Spinner label="Loading your order" />;
   }
@@ -96,13 +97,14 @@ const CurrentOrder = ({
     <WheelModal isOpen={wheelOpen} busy={busy} onCancel={onCancelWheel} />
   );
 
+  // --- Stage: nothing selected yet ---
   if (submission == null) {
     if (!selected) {
       return (
         <Stack grow="fill" space="space.100">
           <Text>
-            No order in progress — select a restaurant from your pool below, or
-            let fate decide.
+            No order in progress. Select a restaurant from your pool below, or
+            let fate decide!
           </Text>
           <Inline>
             <Button isDisabled={busy || poolEmpty} onClick={onPickRandom}>
@@ -114,7 +116,8 @@ const CurrentOrder = ({
       );
     }
 
-    // Selecting stage: fields seed the submission.
+    // --- Stage: selecting (restaurant chosen, order not yet submitted) ---
+    // fields seed the submission.
     return (
       <Stack grow="fill" space="space.100">
         <Text>
@@ -126,7 +129,7 @@ const CurrentOrder = ({
           defaultValue={items}
           onChange={(event) => setItems(event.target.value)}
         />
-        <Label labelFor="orderTotal">Total</Label>
+        <Label labelFor="orderTotal">Total $</Label>
         <Textfield
           id="orderTotal"
           defaultValue={total}
@@ -162,12 +165,13 @@ const CurrentOrder = ({
     );
   }
 
+  // --- Stage: submitted (read-only view) ---
   if (!editingDetails) {
     return (
       <Stack grow="fill" space="space.100">
         <Text>
           Submitted for <Strong>{submission.restaurantName}</Strong>. The
-          restaurant is locked — clear the order to choose a different one.
+          restaurant is locked. Clear the order to choose a different one.
         </Text>
         <Text>Order: {submission.items ?? "—"}</Text>
         <Text>
@@ -194,11 +198,12 @@ const CurrentOrder = ({
     );
   }
 
+  // --- Stage: editing a submitted order ---
   return (
     <Stack grow="fill" space="space.100">
       <Text>
         Editing order for <Strong>{submission.restaurantName}</Strong>. The
-        restaurant stays locked — clear the order to choose a different one.
+        restaurant stays locked. Clear the order to choose a different one.
       </Text>
       <Label labelFor="orderItems">Order</Label>
       <TextArea
@@ -206,7 +211,7 @@ const CurrentOrder = ({
         defaultValue={items}
         onChange={(event) => setItems(event.target.value)}
       />
-      <Label labelFor="orderTotal">Total</Label>
+      <Label labelFor="orderTotal">Total $</Label>
       <Textfield
         id="orderTotal"
         defaultValue={total}
@@ -223,8 +228,10 @@ const CurrentOrder = ({
           appearance="primary"
           isDisabled={busy}
           onClick={async () => {
-            await onSaveSubmission(items, total, notes);
-            setEditingDetails(false);
+            const wasSaved = await onSaveSubmission(items, total, notes);
+            if (wasSaved) {
+              setEditingDetails(false);
+            }
           }}
         >
           Save changes
