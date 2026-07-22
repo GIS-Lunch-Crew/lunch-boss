@@ -159,3 +159,25 @@ export type GetTodaysEventsInput = {
   from: string;
   to: string;
 };
+
+// One person's in-flight order on an event (event_orders row). Same order
+// shape as CurrentSubmission; the restaurant lives on the event, not the row.
+export type EventOrder = {
+  accountId: string;
+  items: string | null;
+  total: number | null;
+  notes: string | null;
+  submittedAt: string;
+};
+
+// The event-detail page payload: the summary plus the restaurant's contact
+// fields ('' means "not provided", as on Restaurant) and everyone's orders.
+// myOrder is server-computed for the caller (null = hasn't ordered).
+export type EventDetail = EventSummary & {
+  address: string;
+  phone: string;
+  website: string | null;
+  menuUrl: string | null;
+  orders: EventOrder[];
+  myOrder: EventOrder | null;
+};

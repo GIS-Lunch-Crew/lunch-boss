@@ -19,7 +19,7 @@ export const updateEventSchema = z.object({
   scheduledAt: instant.optional(),
   teamIds: z
     .array(z.number().int().positive())
-    .min(1, "An outing must keep at least one team")
+    .min(1, "An event must keep at least one team")
     .optional(),
 });
 

@@ -4,6 +4,7 @@ import * as eventOrderRepository from "../storage/eventOrderRepository";
 import * as restaurantRepository from "../storage/restaurantRepository";
 import type {
   CreateEventInput,
+  EventDetail,
   EventSummary,
   GetTodaysEventsInput,
   UpdateEventInput,
@@ -28,7 +29,7 @@ export const createEvent = async (
     throw new Error("Restaurant not found.");
   }
   if (toMs(input.scheduledAt) <= Date.now()) {
-    throw new Error("Outing time must be in the future.");
+    throw new Error("Event time must be in the future.");
   }
   // We do NOT resurrect a soft-deleted restaurant here. In the race where it's
   // deleted after the boss picked it, the outing is still valid — the
@@ -82,6 +83,29 @@ export const getTodaysEvents = async (
   }));
 };
 
+// Single-event detail for the event page. Visibility (created it / a team of
+// mine is targeted / I have an order) is baked into the repository query, so
+// a hidden event and a nonexistent one both read "Event not found."
+export const getEvent = async (
+  accountId: string,
+  eventId: number,
+): Promise<EventDetail> => {
+  const row = await eventRepository.findDetailById(eventId, accountId);
+  if (row === null) {
+    throw new Error("Event not found.");
+  }
+  const [teamRows, orders] = await Promise.all([
+    eventTeamRepository.listByEvents([row.id]),
+    eventOrderRepository.listByEvent(eventId),
+  ]);
+  return {
+    ...row,
+    teamIds: teamRows.map(({ teamId }) => teamId),
+    orders,
+    myOrder: orders.find((order) => order.accountId === accountId) ?? null,
+  };
+};
+
 // Edit is Lunch-Boss-only and allowed only before the outing's time (frozen
 // after). Restaurant is not editable; time may only move later; teams stay ≥1.
 export const updateEvent = async (
@@ -90,13 +114,13 @@ export const updateEvent = async (
 ): Promise<void> => {
   const event = await eventRepository.findById(input.eventId);
   if (event === null) {
-    throw new Error("Outing not found.");
+    throw new Error("Event not found.");
   }
   if (event.hostAccountId !== accountId) {
-    throw new Error("Only the Lunch Boss can edit this outing.");
+    throw new Error("Only the Lunch Boss can edit this event.");
   }
   if (toMs(event.scheduledAt) <= Date.now()) {
-    throw new Error("This outing's time has passed; it can no longer be edited.");
+    throw new Error("This event's time has passed; it can no longer be edited.");
   }
 
   if (input.scheduledAt !== undefined) {
@@ -104,7 +128,7 @@ export const updateEvent = async (
       throw new Error("The new time must be in the future.");
     }
     if (toMs(input.scheduledAt) <= toMs(event.scheduledAt)) {
-      throw new Error("You can only move an outing to a later time.");
+      throw new Error("You can only move an event to a later time.");
     }
     await eventRepository.updateScheduledAt(input.eventId, input.scheduledAt);
   }
@@ -122,15 +146,15 @@ export const deleteEvent = async (
 ): Promise<void> => {
   const event = await eventRepository.findById(eventId);
   if (event === null) {
-    throw new Error("Outing not found.");
+    throw new Error("Event not found.");
   }
   if (event.hostAccountId !== accountId) {
-    throw new Error("Only the Lunch Boss can delete this outing.");
+    throw new Error("Only the Lunch Boss can delete this event.");
   }
   const orderCount = await eventOrderRepository.countByEvent(eventId);
   if (orderCount > 0) {
     throw new Error(
-      "This outing already has orders and can't be deleted — step down instead.",
+      "This event already has orders and can't be deleted — step down instead.",
     );
   }
   await eventTeamRepository.removeByEvent(eventId);

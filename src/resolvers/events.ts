@@ -7,7 +7,7 @@ import {
 } from "../validation/eventSchemas";
 import * as eventService from "../services/eventService";
 import { requireAccountId } from "./context";
-import type { EventSummary } from "../types";
+import type { EventDetail, EventSummary } from "../types";
 
 export const registerEventResolvers = (resolver: Resolver): void => {
   resolver.define<unknown, EventSummary>(
@@ -23,6 +23,14 @@ export const registerEventResolvers = (resolver: Resolver): void => {
     async ({ payload, context }) => {
       const input = getTodaysEventsSchema.parse(payload);
       return eventService.getTodaysEvents(requireAccountId(context), input);
+    },
+  );
+
+  resolver.define<unknown, EventDetail>(
+    "getEvent",
+    async ({ payload, context }) => {
+      const { eventId } = eventIdSchema.parse(payload);
+      return eventService.getEvent(requireAccountId(context), eventId);
     },
   );
 

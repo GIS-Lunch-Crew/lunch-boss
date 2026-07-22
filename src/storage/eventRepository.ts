@@ -64,6 +64,50 @@ export const listVisibleToday = async (
   return result.rows;
 };
 
+// EventRow plus the restaurant's contact fields, for the detail page.
+export type EventDetailRow = EventRow & {
+  address: string;
+  phone: string;
+  website: string | null;
+  menuUrl: string | null;
+};
+
+// Single-event read for the detail page, with the same visibility rule as
+// listVisibleToday baked in: not visible to the caller → null, so the service
+// reports it exactly like a nonexistent event.
+export const findDetailById = async (
+  id: number,
+  accountId: string,
+): Promise<EventDetailRow | null> => {
+  const result = await sql
+    .prepare<EventDetailRow>(
+      `SELECT ${SELECT_FIELDS},
+         r.address,
+         r.phone,
+         r.website,
+         r.menu_url AS menuUrl
+       FROM events e
+       JOIN restaurants r ON r.id = e.restaurant_id
+       WHERE e.id = ?
+         AND (
+           e.created_by = ?
+           OR EXISTS (
+             SELECT 1 FROM event_teams et
+             JOIN team_members tm ON tm.team_id = et.team_id
+             WHERE et.event_id = e.id AND tm.account_id = ?
+           )
+           OR EXISTS (
+             SELECT 1 FROM event_orders eo
+             WHERE eo.event_id = e.id AND eo.account_id = ?
+           )
+         )
+       LIMIT 1`,
+    )
+    .bindParams(id, accountId, accountId, accountId)
+    .execute();
+  return result.rows[0] ?? null;
+};
+
 export const findById = async (id: number): Promise<EventRow | null> => {
   const result = await sql
     .prepare<EventRow>(

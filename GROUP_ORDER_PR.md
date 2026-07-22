@@ -296,3 +296,29 @@ body), so the modal never unmounts and the half-filled date/time/teams survive.
 
 Solo flow (`WheelModal`, `pickRandom` pool-size rules, `startSelection`) is
 unchanged apart from the one-line purpose tag.
+
+### Commit 7 — Event-detail backend (`getEvent`) + backend "outing" string sweep
+
+Events-slice backend half for the Event-detail page. (Re-slice note: the detail
+page is where Events and Orders overlap, so the split is by *layer* — this
+slice builds the whole page with every control rendered but inert; the Orders
+slice then wires submit/edit/cancel, resurrect-on-submit, Add-to-Pool, and
+placement.) `getEvent` bakes the same visibility rule as the today-list
+(created-by-me / my-team / have-an-order) into its WHERE, so a hidden event and
+a nonexistent one both read "Event not found." No date bound on the lookup —
+deliberate, so a placed event stays openable in its preserved state. Also fixes
+the 9 backend strings that leaked "outing" to users via error banners
+(`describeError` surfaces `error.message` verbatim).
+
+| File | Purpose |
+| --- | --- |
+| `src/types/index.ts` | `EventOrder` (one person's order on an event — same shape as `CurrentSubmission`, minus the restaurant, which lives on the event); `EventDetail` = `EventSummary` + restaurant contact fields (`address`, `phone`, `website`, `menuUrl`) + `orders: EventOrder[]` + server-computed `myOrder`. |
+| `src/storage/eventRepository.ts` | `findDetailById(id, accountId)` — the detail select (summary fields + restaurant contact columns, same `deleted_at`-ignoring JOIN) with the visibility clause in the WHERE; not-visible returns `null`, indistinguishable from not-found. |
+| `src/storage/eventOrderRepository.ts` | `listByEvent` — all orders on an event in submission order; returns `[]` until the Orders slice writes rows. |
+| `src/services/eventService.ts` | `getEvent` — assembles the detail row + teamIds + orders + `myOrder` (found by the caller's accountId); `null` row → "Event not found." Also: 8 error strings reworded outing → event. |
+| `src/validation/eventSchemas.ts` | The 9th string: "An outing must keep at least one team" → "An event must keep at least one team". |
+| `src/resolvers/events.ts` | `getEvent` resolver, reusing the existing `eventIdSchema`. |
+
+A definitive sweep confirms the only remaining "outing" occurrences are
+internal identifiers (component/file names, element ids, the `outings` state),
+never user-visible text.
