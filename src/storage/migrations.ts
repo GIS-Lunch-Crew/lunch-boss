@@ -62,13 +62,37 @@ ALTER TABLE user_current_submission ADD COLUMN items TEXT NULL`;
 const ADD_ITEMS_TO_ORDERS = `
 ALTER TABLE orders ADD COLUMN items TEXT NULL`;
 
+// v007/v008: Teams (group ordering). A team is a named group a user can join;
+// team_members is the join table (account_id side is the Atlassian accountId,
+// not a users table — CONTEXT.md §3.3). name_normalized (trim+lowercase) has a
+// UNIQUE backstop so "Joe's" and "joe's" can't both exist; the service checks
+// it first and links the caller to the existing team on a match.
+const CREATE_TEAMS = `
+CREATE TABLE IF NOT EXISTS teams (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL,
+  name_normalized VARCHAR(255) NOT NULL,
+  created_by VARCHAR(128) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_team_name (name_normalized)
+)`;
+
+const CREATE_TEAM_MEMBERS = `
+CREATE TABLE IF NOT EXISTS team_members (
+  account_id VARCHAR(128) NOT NULL,
+  team_id INT NOT NULL,
+  PRIMARY KEY (account_id, team_id)
+)`;
+
 const migrations = migrationRunner
   .enqueue('v001_create_restaurants', CREATE_RESTAURANTS)
   .enqueue('v002_create_user_saved_restaurants', CREATE_USER_SAVED_RESTAURANTS)
   .enqueue('v003_create_user_current_submission', CREATE_USER_CURRENT_SUBMISSION)
   .enqueue('v004_create_orders', CREATE_ORDERS)
   .enqueue('v005_add_items_to_user_current_submission', ADD_ITEMS_TO_SUBMISSION)
-  .enqueue('v006_add_items_to_orders', ADD_ITEMS_TO_ORDERS);
+  .enqueue('v006_add_items_to_orders', ADD_ITEMS_TO_ORDERS)
+  .enqueue('v007_create_teams', CREATE_TEAMS)
+  .enqueue('v008_create_team_members', CREATE_TEAM_MEMBERS);
 
 export const applyMigrations = async (): Promise<string[]> => {
   const applied = await migrations.run();

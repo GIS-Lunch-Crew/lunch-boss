@@ -98,3 +98,25 @@ export type OrderStats = {
     count: number;
   } | null;
 };
+
+// --- Teams (group ordering) ---
+
+export type Team = {
+  id: number;
+  name: string;
+  // Atlassian accountId of whoever created it (attribution only).
+  createdBy: string;
+};
+
+export type CreateTeamInput = {
+  name: string;
+};
+
+// Like addRestaurant, createTeam never fails on an existing (normalized) name:
+// it links the caller to the existing team instead and reports which happened.
+export type CreateTeamOutcome = "created" | "joined-existing";
+
+export type CreateTeamResult = {
+  team: Team;
+  outcome: CreateTeamOutcome;
+};

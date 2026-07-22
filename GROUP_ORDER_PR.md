@@ -157,6 +157,27 @@ team / Lunch Boss / date transitively through the outing.
 
 ---
 
+## Build Order (vertical slices)
+
+Built as end-to-end slices so each is demoable when its UI commit lands
+(`CONTEXT.md` §8: every step deployable **and demonstrable**). Backend and UI
+are usually separate commits within a slice; the slice becomes demoable at its
+UI commit. This is purely commit ordering — the design/schema above is unchanged.
+
+1. **Teams** — create / join / leave / list. *(Demo: make a team, join one.)*
+2. **Start & see outings** — `events` + `event_teams`, create/read/edit backend,
+   Home strip + create-outing UI. *(Demo: start an outing; a teammate sees it.)*
+3. **Order on an outing** — `event_orders`, submit/edit/cancel, detail + order
+   form + pool toggle. *(Demo: order on an outing.)*
+4. **Place the batch** — `orders.event_id` + placement + place button.
+   *(Demo: place; it lands in everyone's history.)*
+5. **Step down / claim + time-change notice** — depends on orders existing, so
+   it follows slice 3–4. *(Demo: boss steps down, an orderer claims; a time
+   change notifies.)*
+6. **Polish** — decline/gray-out (optional), docs.
+
+---
+
 ## Implementation Log
 
 ### Commit 1 — order history dates timezone-correct (`4a93ac9`)
@@ -172,3 +193,21 @@ renders stored UTC timestamps in the viewer's **local** time on the way out.
 | `src/storage/orderRepository.ts`           | Filters `ordered_at` directly against a **half-open** UTC range (`>= from AND < to`) instead of `DATE(ordered_at)`. Fixes the near-midnight "wrong day" straddle and keeps the range sargable for `idx_orders_account_ordered`. |
 | `src/frontend/index.tsx`                   | Converts each picked local calendar day into UTC instant bounds before invoking `getOrders`; the `DatePicker`/filter state still deal in local dates.                                                                           |
 | `src/frontend/components/OrderHistory.tsx` | `formatDate` parses the zone-less DB timestamp as UTC and renders it in the viewer's local time; updated the now-stale filter caveat comment.                                                                                   |
+
+### Commit 2 — Teams backend (schema + resolvers, no UI)
+
+Slice 1, backend half: the data + API layer for teams. Backend only — the Teams
+tab lands in the next commit. Create-or-join on a normalized name mirrors
+`addRestaurant` (an existing name links you in rather than erroring); both paths
+end with the caller as a member.
+
+| File | Purpose |
+| --- | --- |
+| `src/storage/migrations.ts` | `v007_create_teams`, `v008_create_team_members`. `teams.name_normalized` has a UNIQUE backstop; `team_members` PK `(account_id, team_id)`. |
+| `src/types/index.ts` | `Team`, `CreateTeamInput`, `CreateTeamResult` / `CreateTeamOutcome`. |
+| `src/validation/teamSchemas.ts` | `createTeamSchema`, `teamIdSchema` (resolver-boundary zod). |
+| `src/storage/teamRepository.ts` | `findByNormalizedName`, `findById`, `listAll`, `insert`. |
+| `src/storage/teamMemberRepository.ts` | `save` (INSERT IGNORE, idempotent join), `remove`, `listByAccount`. |
+| `src/services/teamService.ts` | `createTeam` (create-or-join), `joinTeam`, `leaveTeam`, `listTeams`, `getMyTeams`. |
+| `src/resolvers/teams.ts` | Resolvers: `getTeams`, `getMyTeams`, `createTeam`, `joinTeam`, `leaveTeam`. |
+| `src/resolvers/index.ts` | Registered the team resolvers. |
