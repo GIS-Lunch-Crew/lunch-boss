@@ -273,3 +273,26 @@ shows today's. Edit/delete land next.
 
 Notes: state is named `outings` (not `events`) to avoid colliding with the
 bridge Events-API import; `TimePicker` is a Preview component.
+
+### Commit 6 — spin-the-wheel in the create panel
+
+Follow-on to slice 2 (a deferred fork): the Lunch Boss can pick the restaurant
+by spinning the wheel from inside the "Be a Lunch Boss" panel, not just the
+`Select`. Frontend only — the wheel already fetches the boss's own pool
+(`getSavedRestaurants`), so no resolver/service/repository/SQL change.
+
+The wheel Custom UI emits its winner to one shared Events-API channel
+(`lunch-boss.wheel-result`). The host now disambiguates *why* the wheel was
+spun via a `wheelPurposeRef` (a **ref**, not state — the `events.on` handler is
+subscribed once with `[]` deps, so state would be captured stale and misroute a
+create-panel spin to the solo order flow). The result is routed in-panel by a
+**content-swap** (the wheel `Frame` replaces the form inside the same modal
+body), so the modal never unmounts and the half-filled date/time/teams survive.
+
+| File | Purpose |
+| --- | --- |
+| `src/frontend/index.tsx` | `wheelPurposeRef` + `createEventWheelWinner` state; `pickRandom` tags `"solo"`; the shared `events.on` handler branches (`"solo"` → `startSelection` unchanged, `"create-event"` → route to the create panel); `handleOpenCreateWheel` tags `"create-event"`; passes `wheelWinner` + `onOpenWheel` to the modal. |
+| `src/frontend/components/CreateOutingModal.tsx` | "Spin the wheel" button beside a now-**controlled** Restaurant `Select` (pool 0 → disabled, pool 1 → instant fill, 2+ → spin, mirroring the solo rules); `showWheel` content-swap rendering the wheel `Frame` in the modal body; effects sync an arriving `wheelWinner` into the field and reset the wheel view whenever the modal closes. |
+
+Solo flow (`WheelModal`, `pickRandom` pool-size rules, `startSelection`) is
+unchanged apart from the one-line purpose tag.
