@@ -24,13 +24,13 @@ type Props = {
 const WheelModal = ({ isOpen, busy, onCancel }: Props) => (
   <ModalTransition>
     {isOpen && (
-      <Modal onClose={onCancel}>
+      <Modal onClose={onCancel} shouldScrollInViewport={false}>
         <ModalHeader>
           <ModalTitle>Spin the wheel</ModalTitle>
         </ModalHeader>
         <ModalBody>
           <Text>Spin the wheel. Fate picks where you're eating.</Text>
-          <Frame resource="wheel" />
+          <Frame resource="wheel" height="280px" />
         </ModalBody>
         <ModalFooter>
           <Button appearance="subtle" isDisabled={busy} onClick={onCancel}>

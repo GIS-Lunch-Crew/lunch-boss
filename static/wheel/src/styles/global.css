@@ -32,8 +32,14 @@
 html,
 body {
   margin: 0;
+  height: 100%;
+  overflow: hidden;
   background: transparent;
   font-family: var(--font-body);
+}
+
+#root {
+  height: 100%;
 }
 
 [data-color-mode="dark"] {
