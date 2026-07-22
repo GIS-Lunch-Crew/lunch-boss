@@ -2,7 +2,10 @@
 .wheel-app {
   display: flex;
   justify-content: center;
-  padding: 8px 0;
+  align-items: flex-start;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 28px 0 8px;
   animation: wheel-app-enter 300ms ease-out;
   transition:
     opacity 400ms ease,

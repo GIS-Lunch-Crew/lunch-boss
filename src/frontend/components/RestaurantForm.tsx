@@ -10,6 +10,7 @@ import {
   ModalHeader,
   ModalTitle,
   Pressable,
+  RequiredAsterisk,
   Stack,
   Textfield,
   xcss,
@@ -76,9 +77,13 @@ const RestaurantForm = ({
           <Inline shouldWrap space="space.150">
             <Box xcss={fieldStyle}>
               <Stack space="space.050">
-                <Label labelFor="name">Name (required)</Label>
+                <Label labelFor="name">
+                  Name
+                  <RequiredAsterisk />
+                </Label>
                 <Textfield
                   id="name"
+                  isRequired
                   defaultValue={name}
                   onChange={(event) => setName(event.target.value)}
                 />

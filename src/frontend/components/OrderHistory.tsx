@@ -130,7 +130,7 @@ const OrderHistory = ({
         <Text>
           {filtered
             ? "No orders in this date range."
-            : "No orders yet — your placed orders will show up here."}
+            : "No orders yet. Your placed orders will show up here."}
         </Text>
       ) : (
         <DynamicTable head={head} rows={rows} />

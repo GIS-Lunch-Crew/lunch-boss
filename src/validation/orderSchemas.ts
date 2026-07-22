@@ -7,10 +7,14 @@ export const getOrdersSchema = z.object({
   to: isoDate.optional(),
 });
 
+// Well under the total column's DECIMAL(10,2) ceiling (99999999.99) — a
+// lunch order total anywhere near that is a typo, not a real value.
+const MAX_TOTAL = 100000;
+
 export const submitOrderSchema = z.object({
   restaurantId: z.number().int().positive(),
   items: z.string().trim().max(2000).optional(),
-  total: z.number().nonnegative().optional(),
+  total: z.number().nonnegative().max(MAX_TOTAL).optional(),
   notes: z.string().trim().max(1000).optional(),
 });
 
@@ -18,6 +22,6 @@ export const submitOrderSchema = z.object({
 // (CONTEXT.md §3.12) — clearing is the only way to change it.
 export const updateSubmissionSchema = z.object({
   items: z.string().trim().max(2000).optional(),
-  total: z.number().nonnegative().optional(),
+  total: z.number().nonnegative().max(MAX_TOTAL).optional(),
   notes: z.string().trim().max(1000).optional(),
 });

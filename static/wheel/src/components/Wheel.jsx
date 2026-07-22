@@ -10,6 +10,13 @@ import "../styles/Wheel.css";
 const SIZE = 300;
 const CENTER = SIZE / 2;
 const RADIUS = 140;
+const LABEL_RADIUS = RADIUS - 8;
+const HUB_RADIUS = 40;
+const HUB_MARGIN = 2;
+const AVG_CHAR_WIDTH = 8;
+const MAX_LABEL_CHARS = Math.floor(
+  (LABEL_RADIUS - HUB_RADIUS - HUB_MARGIN) / AVG_CHAR_WIDTH,
+);
 
 // Converts an angle measured clockwise from 12 o'clock into an SVG point on
 // the wheel's circumference, matching the rotation convention in wheelMath.
@@ -83,10 +90,9 @@ const Wheel = ({ restaurants, disabled, onSpinStart, onSpinComplete }) => {
           const startAngle = index * wedgeAngle;
           const endAngle = startAngle + wedgeAngle;
           const midAngle = (startAngle + endAngle) / 2;
-          const labelRadius = RADIUS * 0.62;
           const radians = (midAngle * Math.PI) / 180;
-          const tx = CENTER + labelRadius * Math.sin(radians);
-          const ty = CENTER - labelRadius * Math.cos(radians);
+          const tx = CENTER + LABEL_RADIUS * Math.sin(radians);
+          const ty = CENTER - LABEL_RADIUS * Math.cos(radians);
 
           return (
             <g key={restaurant.id}>
@@ -97,11 +103,12 @@ const Wheel = ({ restaurants, disabled, onSpinStart, onSpinComplete }) => {
               <text
                 x={tx}
                 y={ty}
+                dy="0.35em"
                 className="wheel__label"
-                transform={`rotate(${midAngle}, ${tx}, ${ty})`}
+                transform={`rotate(${midAngle + 90}, ${tx}, ${ty})`}
               >
-                {restaurant.name.length > 18
-                  ? `${restaurant.name.slice(0, 17)}…`
+                {restaurant.name.length > MAX_LABEL_CHARS
+                  ? `${restaurant.name.slice(0, MAX_LABEL_CHARS - 1)}…`
                   : restaurant.name}
               </text>
             </g>

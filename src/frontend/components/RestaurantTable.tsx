@@ -51,11 +51,11 @@ const RestaurantTable = ({
       { key: "name", content: restaurant.name },
       {
         key: "phone",
-        content: restaurant.phone === "" ? "N/A" : restaurant.phone,
+        content: restaurant.phone === "" ? "—" : restaurant.phone,
       },
       {
         key: "address",
-        content: restaurant.address === "" ? "N/A" : restaurant.address,
+        content: restaurant.address === "" ? "—" : restaurant.address,
       },
       // --- Row actions ---
       {
@@ -101,7 +101,7 @@ const RestaurantTable = ({
           head={head}
           rows={rows}
           highlightedRowIndex={
-            highlightedRowIndex === -1 ? undefined : highlightedRowIndex
+            highlightedRowIndex === -1 ? undefined : [highlightedRowIndex]
           }
         />
       )}

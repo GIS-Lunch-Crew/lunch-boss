@@ -7,6 +7,7 @@ modules:
         function: resolver
       title: Lunch Boss
       route: lunch-boss
+      icon: resource:icons;LunchBossLogo_Orange.png
   function:
     - key: resolver
       handler: index.handler
@@ -24,6 +25,8 @@ resources:
     path: src/frontend/index.tsx
   - key: wheel
     path: static/wheel/build
+  - key: icons
+    path: static/icons
 app:
   runtime:
     name: nodejs24.x
