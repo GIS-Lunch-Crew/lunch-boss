@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Button,
   CheckboxGroup,
   DatePicker,
+  Frame,
   Icon,
   Inline,
   Label,
@@ -41,6 +42,10 @@ type Props = {
   busy: boolean;
   // Local YYYY-MM-DD, used as the DatePicker's minDate so past days are greyed.
   todayDate: string;
+  // A wheel result the host routed here; syncs into the Restaurant field.
+  wheelWinner: { id: number; name: string } | null;
+  // Tags the next wheel result for this panel before its Frame mounts.
+  onOpenWheel: () => void;
   // date = local YYYY-MM-DD, time = local HH:mm; the parent combines them into
   // a UTC instant before invoking createEvent.
   onCreate: (
@@ -58,6 +63,8 @@ const CreateOutingModal = ({
   teams,
   busy,
   todayDate,
+  wheelWinner,
+  onOpenWheel,
   onCreate,
   onCancel,
 }: Props) => {
@@ -66,11 +73,47 @@ const CreateOutingModal = ({
   const [time, setTime] = useState("");
   // CheckboxGroup values are strings; converted to numbers on submit.
   const [teamIds, setTeamIds] = useState<string[]>([]);
+  // Content-swap flag: while true the body shows the wheel Frame in place of
+  // the form (the modal never unmounts, so the other fields survive).
+  const [showWheel, setShowWheel] = useState(false);
 
-  const restaurantOptions = (restaurants ?? []).map((restaurant) => ({
+  // A wheel result arrived — fill the Restaurant field and swap back to the
+  // form. Fires only when wheelWinner changes (the host sends a fresh object
+  // each spin, so a repeat winner still lands).
+  useEffect(() => {
+    if (wheelWinner) {
+      setRestaurantId(wheelWinner.id);
+      setShowWheel(false);
+    }
+  }, [wheelWinner]);
+
+  // Closing the modal (header ✕, Cancel, or a successful create) must not leave
+  // the wheel staged for the next open.
+  useEffect(() => {
+    if (!isOpen) {
+      setShowWheel(false);
+    }
+  }, [isOpen]);
+
+  const pool = restaurants ?? [];
+  const restaurantOptions = pool.map((restaurant) => ({
     label: restaurant.name,
     value: String(restaurant.id),
   }));
+  const selectedRestaurantOption =
+    restaurantOptions.find((option) => option.value === String(restaurantId)) ??
+    null;
+
+  // Mirrors the solo flow: an empty pool disables the spin; a pool of one skips
+  // the wheel and fills that restaurant; two or more spins.
+  const handleSpin = () => {
+    if (pool.length === 1) {
+      setRestaurantId(pool[0].id);
+      return;
+    }
+    onOpenWheel();
+    setShowWheel(true);
+  };
   const teamOptions = (teams ?? []).map((team) => ({
     label: team.name,
     value: String(team.id),
@@ -95,84 +138,119 @@ const CreateOutingModal = ({
               </Pressable>
             </Inline>
           </ModalHeader>
-          <ModalBody>
-            <Stack space="space.150">
-              <Stack space="space.050">
-                <Label labelFor="outingRestaurant">Restaurant</Label>
-                <Select
-                  id="outingRestaurant"
-                  placeholder="Pick from your pool"
-                  options={restaurantOptions}
-                  onChange={(option) =>
-                    setRestaurantId(
-                      option
-                        ? Number((option as { value: string }).value)
-                        : null,
-                    )
-                  }
-                />
-              </Stack>
-              <Inline space="space.150" shouldWrap>
-                <Stack space="space.050">
-                  <Label labelFor="outingDate">Date</Label>
-                  <Box xcss={dateWidth}>
-                    <DatePicker
-                      id="outingDate"
-                      minDate={todayDate}
-                      placeholder={todayDate}
-                      onChange={(value) => setDate(value)}
-                    />
-                  </Box>
+          {showWheel ? (
+            <>
+              <ModalBody>
+                <Stack space="space.150">
+                  <Text>Spin the wheel — fate picks the restaurant.</Text>
+                  <Frame resource="wheel" />
                 </Stack>
-                <Stack space="space.050">
-                  <Label labelFor="outingTime">Time</Label>
-                  <Box xcss={timeWidth}>
-                    <TimePicker
-                      id="outingTime"
-                      timeFormat="HH:mm"
-                      times={HALF_HOUR_TIMES}
-                      placeholder="13:30"
-                      timeIsEditable
-                      onChange={(value) => setTime(value)}
-                    />
-                  </Box>
+              </ModalBody>
+              <ModalFooter>
+                <Button
+                  appearance="subtle"
+                  isDisabled={busy}
+                  onClick={() => setShowWheel(false)}
+                >
+                  Cancel
+                </Button>
+              </ModalFooter>
+            </>
+          ) : (
+            <>
+              <ModalBody>
+                <Stack space="space.150">
+                  <Stack space="space.050">
+                    <Label labelFor="outingRestaurant">Restaurant</Label>
+                    <Inline space="space.100" alignBlock="center">
+                      <Select
+                        id="outingRestaurant"
+                        placeholder="Pick from your pool"
+                        options={restaurantOptions}
+                        value={selectedRestaurantOption}
+                        onChange={(option) =>
+                          setRestaurantId(
+                            option
+                              ? Number((option as { value: string }).value)
+                              : null,
+                          )
+                        }
+                      />
+                      <Button
+                        isDisabled={busy || pool.length === 0}
+                        onClick={handleSpin}
+                      >
+                        Spin the wheel
+                      </Button>
+                    </Inline>
+                  </Stack>
+                  <Inline space="space.150" shouldWrap>
+                    <Stack space="space.050">
+                      <Label labelFor="outingDate">Date</Label>
+                      <Box xcss={dateWidth}>
+                        <DatePicker
+                          id="outingDate"
+                          minDate={todayDate}
+                          placeholder={todayDate}
+                          onChange={(value) => setDate(value)}
+                        />
+                      </Box>
+                    </Stack>
+                    <Stack space="space.050">
+                      <Label labelFor="outingTime">Time</Label>
+                      <Box xcss={timeWidth}>
+                        <TimePicker
+                          id="outingTime"
+                          timeFormat="HH:mm"
+                          times={HALF_HOUR_TIMES}
+                          placeholder="13:30"
+                          timeIsEditable
+                          onChange={(value) => setTime(value)}
+                        />
+                      </Box>
+                    </Stack>
+                  </Inline>
+                  <Stack space="space.050">
+                    <Label labelFor="outingTeams">Visible to teams</Label>
+                    {teamOptions.length === 0 ? (
+                      <Text>Join a team first to create an event.</Text>
+                    ) : (
+                      <CheckboxGroup
+                        name="outingTeams"
+                        options={teamOptions}
+                        value={teamIds}
+                        onChange={(values) =>
+                          setTeamIds((values as string[]) ?? [])
+                        }
+                      />
+                    )}
+                  </Stack>
                 </Stack>
-              </Inline>
-              <Stack space="space.050">
-                <Label labelFor="outingTeams">Visible to teams</Label>
-                {teamOptions.length === 0 ? (
-                  <Text>Join a team first to create an event.</Text>
-                ) : (
-                  <CheckboxGroup
-                    name="outingTeams"
-                    options={teamOptions}
-                    value={teamIds}
-                    onChange={(values) =>
-                      setTeamIds((values as string[]) ?? [])
-                    }
-                  />
-                )}
-              </Stack>
-            </Stack>
-          </ModalBody>
-          <ModalFooter>
-            <Inline space="space.100">
-              <Button
-                appearance="primary"
-                isDisabled={!canCreate}
-                onClick={() => {
-                  if (restaurantId !== null) {
-                    onCreate(restaurantId, date, time, teamIds.map(Number));
-                  }
-                }}
-              >
-                Be the Boss
-              </Button>
-              <Button appearance="subtle" isDisabled={busy} onClick={onCancel}>
-                Cancel
-              </Button>
-            </Inline>
-          </ModalFooter>
+              </ModalBody>
+              <ModalFooter>
+                <Inline space="space.100">
+                  <Button
+                    appearance="primary"
+                    isDisabled={!canCreate}
+                    onClick={() => {
+                      if (restaurantId !== null) {
+                        onCreate(restaurantId, date, time, teamIds.map(Number));
+                      }
+                    }}
+                  >
+                    Be the Boss
+                  </Button>
+                  <Button
+                    appearance="subtle"
+                    isDisabled={busy}
+                    onClick={onCancel}
+                  >
+                    Cancel
+                  </Button>
+                </Inline>
+              </ModalFooter>
+            </>
+          )}
         </Modal>
       )}
     </ModalTransition>

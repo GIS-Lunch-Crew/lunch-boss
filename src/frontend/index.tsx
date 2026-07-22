@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import ForgeReconciler, {
   Box,
   Button,
@@ -111,8 +111,16 @@ const App = () => {
   >(undefined);
   const [selected, setSelected] = useState<SelectionTarget | null>(null);
   const [prefill, setPrefill] = useState<OrderPrefill | null>(null);
-  // True while the spin-the-wheel Frame is showing (pool of 2+ only).
+  // True while the solo spin-the-wheel Frame is showing (pool of 2+ only).
   const [wheelOpen, setWheelOpen] = useState(false);
+  // Why the wheel was last opened. The wheel emits its winner to one shared
+  // channel; this tells the (once-subscribed) handler where to route it. A ref,
+  // not state, because the handler captures its value at subscribe-time — state
+  // would go stale and misroute a create-panel spin to the solo flow.
+  const wheelPurposeRef = useRef<"solo" | "create-event">("solo");
+  // A wheel result routed to the create panel (null until a spin lands there).
+  const [createEventWheelWinner, setCreateEventWheelWinner] =
+    useState<SelectionTarget | null>(null);
   // Bumped on every startSelection so CurrentOrder remounts (and its fields
   // reset/prefill) even when the same restaurant is selected again.
   const [selectionVersion, setSelectionVersion] = useState(0);
@@ -326,6 +334,12 @@ const App = () => {
     setCreateOutingOpen(true);
   };
 
+  // Tag the next wheel result for the create panel before its Frame mounts, so
+  // the shared result handler routes the winner into the form (not solo).
+  const handleOpenCreateWheel = () => {
+    wheelPurposeRef.current = "create-event";
+  };
+
   const handleCreateOuting = (
     restaurantId: number,
     date: string,
@@ -360,19 +374,30 @@ const App = () => {
   };
 
   // The wheel (Custom UI inside a Frame) reports its winner through the
-  // Events API — the documented Frame↔host communication channel.
+  // Events API — the documented Frame↔host communication channel. One shared
+  // channel serves both the solo flow and the create panel; wheelPurposeRef
+  // (read live, hence a ref) decides where each result goes.
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | undefined;
     events
       .on("lunch-boss.wheel-result", (payload?: SelectionTarget) => {
-        if (
+        const winner =
           payload &&
           typeof payload.id === "number" &&
           typeof payload.name === "string"
-        ) {
-          startSelection({ id: payload.id, name: payload.name });
+            ? { id: payload.id, name: payload.name }
+            : null;
+        if (wheelPurposeRef.current === "create-event") {
+          // Route into the create panel; its own state closes the wheel view.
+          if (winner) {
+            setCreateEventWheelWinner(winner);
+          }
+        } else {
+          if (winner) {
+            startSelection(winner);
+          }
+          setWheelOpen(false);
         }
-        setWheelOpen(false);
       })
       .then((sub) => {
         subscription = sub;
@@ -398,6 +423,7 @@ const App = () => {
       return;
     }
     setMessage(null);
+    wheelPurposeRef.current = "solo";
     setWheelOpen(true);
   };
 
@@ -601,6 +627,8 @@ const App = () => {
               teams={myTeams}
               busy={busy}
               todayDate={todayLocalDate()}
+              wheelWinner={createEventWheelWinner}
+              onOpenWheel={handleOpenCreateWheel}
               onCreate={handleCreateOuting}
               onCancel={() => setCreateOutingOpen(false)}
             />
