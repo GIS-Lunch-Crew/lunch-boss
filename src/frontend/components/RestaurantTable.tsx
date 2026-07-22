@@ -101,7 +101,7 @@ const RestaurantTable = ({
           head={head}
           rows={rows}
           highlightedRowIndex={
-            highlightedRowIndex === -1 ? undefined : highlightedRowIndex
+            highlightedRowIndex === -1 ? undefined : [highlightedRowIndex]
           }
         />
       )}
