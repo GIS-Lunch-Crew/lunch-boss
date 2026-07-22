@@ -211,3 +211,15 @@ end with the caller as a member.
 | `src/services/teamService.ts` | `createTeam` (create-or-join), `joinTeam`, `leaveTeam`, `listTeams`, `getMyTeams`. |
 | `src/resolvers/teams.ts` | Resolvers: `getTeams`, `getMyTeams`, `createTeam`, `joinTeam`, `leaveTeam`. |
 | `src/resolvers/index.ts` | Registered the team resolvers. |
+
+### Commit 3 — Teams UI (completes the teams slice)
+
+Slice 1, UI half — the frontend over the commit-2 backend. Teams are now usable
+end to end: create, join, and leave from a new **Teams** tab (position 3: Home /
+Restaurants / Teams / History). `Select` isn't creatable, so joining an existing
+team (dropdown) and creating/joining by name (text field) are separate controls.
+
+| File | Purpose |
+| --- | --- |
+| `src/frontend/components/TeamsPanel.tsx` | New. "My teams" list with Leave buttons; a join `Select` (only teams you're not already in); a "Create or join by name" `Textfield` + button (leans on `createTeam`'s create-or-join). |
+| `src/frontend/index.tsx` | `myTeams`/`allTeams` state; `refreshTeams` (parallel `getMyTeams` + `getTeams`) in the load effect; `handleCreateOrJoinByName` (message by outcome), `handleJoinTeam`, `handleLeaveTeam`; new Teams tab + panel. |

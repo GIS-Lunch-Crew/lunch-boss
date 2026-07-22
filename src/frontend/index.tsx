@@ -22,13 +22,16 @@ import OrderHistory from "./components/OrderHistory";
 import RestaurantFormModal from "./components/RestaurantFormModal";
 import type { RestaurantFields } from "./components/RestaurantForm";
 import RestaurantTable from "./components/RestaurantTable";
+import TeamsPanel from "./components/TeamsPanel";
 import type {
   AddRestaurantResult,
+  CreateTeamResult,
   CurrentSubmission,
   CurrentSubmissionResult,
   OrderStats,
   PlacedOrder,
   Restaurant,
+  Team,
 } from "../types";
 
 type Message = {
@@ -110,6 +113,10 @@ const App = () => {
   const [displayName, setDisplayName] = useState<string | null>(null);
   // Bumped after a successful add so the (uncontrolled) form fields clear.
   const [formVersion, setFormVersion] = useState(0);
+  // Teams: myTeams = the caller's memberships; allTeams = every site team
+  // (powers the join dropdown). null = still loading.
+  const [myTeams, setMyTeams] = useState<Team[] | null>(null);
+  const [allTeams, setAllTeams] = useState<Team[] | null>(null);
   // Not persisted; always resets to Home on load.
   const [activeTab, setActiveTab] = useState(0);
 
@@ -143,10 +150,26 @@ const App = () => {
     }
   }, []);
 
+  const refreshTeams = useCallback(async () => {
+    try {
+      const [mine, all] = await Promise.all([
+        invoke<Team[]>("getMyTeams"),
+        invoke<Team[]>("getTeams"),
+      ]);
+      setMyTeams(unwrap(mine));
+      setAllTeams(unwrap(all));
+    } catch (error) {
+      setMessage({ appearance: "error", text: describeError(error) });
+      setMyTeams([]);
+      setAllTeams([]);
+    }
+  }, []);
+
   useEffect(() => {
     refresh();
     refreshSubmission();
     refreshStats();
+    refreshTeams();
     view
       .getContext()
       .then((context) => setEnvironmentType(context.environmentType));
@@ -157,7 +180,7 @@ const App = () => {
         setDisplayName(user.displayName ?? null),
       )
       .catch(() => setDisplayName(null));
-  }, [refresh, refreshSubmission, refreshStats]);
+  }, [refresh, refreshSubmission, refreshStats, refreshTeams]);
 
   const refreshOrders = useCallback(async () => {
     try {
@@ -222,6 +245,35 @@ const App = () => {
         setSelected(null);
       }
       await refresh();
+    });
+
+  // --- Teams ---
+  // createTeam is create-or-join on the normalized name (like addRestaurant):
+  // a new name creates, an existing one joins. Outcome drives the message.
+  const handleCreateOrJoinByName = (name: string) =>
+    runAction(async () => {
+      const result = unwrap(
+        await invoke<CreateTeamResult>("createTeam", { name }),
+      );
+      setMessage({
+        appearance: "success",
+        text: result.outcome === "created" ? "Team created." : "Joined team.",
+      });
+      await refreshTeams();
+    });
+
+  const handleJoinTeam = (teamId: number) =>
+    runAction(async () => {
+      await invoke("joinTeam", { teamId });
+      setMessage({ appearance: "success", text: "Joined team." });
+      await refreshTeams();
+    });
+
+  const handleLeaveTeam = (teamId: number) =>
+    runAction(async () => {
+      await invoke("leaveTeam", { teamId });
+      setMessage({ appearance: "information", text: "Left team." });
+      await refreshTeams();
     });
 
   // --- Order lifecycle (CONTEXT.md §3.12) ---
@@ -436,6 +488,7 @@ const App = () => {
         <TabList>
           <Tab>Home</Tab>
           <Tab>Restaurants</Tab>
+          <Tab>Teams</Tab>
           <Tab>History</Tab>
         </TabList>
 
@@ -510,6 +563,19 @@ const App = () => {
                 onDelete={handleDelete}
               />
             </Stack>
+          </Box>
+        </TabPanel>
+
+        <TabPanel>
+          <Box xcss={tabPanelTopSpacing}>
+            <TeamsPanel
+              myTeams={myTeams}
+              allTeams={allTeams}
+              busy={busy}
+              onCreateOrJoinByName={handleCreateOrJoinByName}
+              onJoin={handleJoinTeam}
+              onLeave={handleLeaveTeam}
+            />
           </Box>
         </TabPanel>
 
