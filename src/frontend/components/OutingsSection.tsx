@@ -4,6 +4,7 @@ import {
   Button,
   Heading,
   Inline,
+  Pressable,
   Spinner,
   Stack,
   Text,
@@ -19,6 +20,8 @@ type Props = {
   teams: Team[] | null;
   busy: boolean;
   onStartOuting: () => void;
+  // Clicking a card opens the Event-detail page.
+  onOpenEvent: (event: EventSummary) => void;
 };
 
 // Cards scroll horizontally; the Inline doesn't wrap, so it overflows and the
@@ -46,7 +49,13 @@ const formatInstant = (value: string): string => {
       });
 };
 
-const OutingsSection = ({ events, teams, busy, onStartOuting }: Props) => {
+const OutingsSection = ({
+  events,
+  teams,
+  busy,
+  onStartOuting,
+  onOpenEvent,
+}: Props) => {
   const teamName = (id: number): string =>
     (teams ?? []).find((team) => team.id === id)?.name ?? `Team ${id}`;
 
@@ -66,8 +75,13 @@ const OutingsSection = ({ events, teams, busy, onStartOuting }: Props) => {
         <Box xcss={scrollRow}>
           <Inline space="space.150" alignBlock="start">
             {events.map((event) => (
-              <Box key={event.id} xcss={cardStyle}>
-                <Stack space="space.100">
+              <Pressable
+                key={event.id}
+                xcss={cardStyle}
+                isDisabled={busy}
+                onClick={() => onOpenEvent(event)}
+              >
+                <Stack space="space.100" alignInline="start">
                   <Heading as="h3">{event.restaurantName}</Heading>
                   <Text>{formatInstant(event.scheduledAt)}</Text>
                   {event.hostAccountId ? (
@@ -81,7 +95,7 @@ const OutingsSection = ({ events, teams, busy, onStartOuting }: Props) => {
                       : "—"}
                   </Text>
                 </Stack>
-              </Box>
+              </Pressable>
             ))}
           </Inline>
         </Box>

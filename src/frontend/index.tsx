@@ -25,11 +25,13 @@ import RestaurantTable from "./components/RestaurantTable";
 import TeamsPanel from "./components/TeamsPanel";
 import OutingsSection from "./components/OutingsSection";
 import CreateOutingModal from "./components/CreateOutingModal";
+import EventDetailModal from "./components/EventDetailModal";
 import type {
   AddRestaurantResult,
   CreateTeamResult,
   CurrentSubmission,
   CurrentSubmissionResult,
+  EventDetail,
   EventSummary,
   OrderStats,
   PlacedOrder,
@@ -151,6 +153,10 @@ const App = () => {
   // `outings` (not `events`) to avoid colliding with the bridge Events API.
   const [outings, setOutings] = useState<EventSummary[] | null>(null);
   const [createOutingOpen, setCreateOutingOpen] = useState(false);
+  // The card the user clicked (null = detail page closed) and its full detail
+  // from getEvent (null = still loading). The summary seeds the instant paint.
+  const [openedEvent, setOpenedEvent] = useState<EventSummary | null>(null);
+  const [eventDetail, setEventDetail] = useState<EventDetail | null>(null);
   // Not persisted; always resets to Home on load.
   const [activeTab, setActiveTab] = useState(0);
 
@@ -338,6 +344,27 @@ const App = () => {
   // the shared result handler routes the winner into the form (not solo).
   const handleOpenCreateWheel = () => {
     wheelPurposeRef.current = "create-event";
+  };
+
+  // Open the Event-detail page: paint from the card's summary immediately,
+  // then fill contact fields + orders when getEvent lands. On failure (e.g.
+  // the event was deleted, or visibility changed) close and refresh the strip.
+  const handleOpenEvent = (event: EventSummary) => {
+    setMessage(null);
+    setOpenedEvent(event);
+    setEventDetail(null);
+    invoke<EventDetail>("getEvent", { eventId: event.id })
+      .then((result) => setEventDetail(unwrap(result)))
+      .catch((error) => {
+        setMessage({ appearance: "error", text: describeError(error) });
+        setOpenedEvent(null);
+        refreshOutings();
+      });
+  };
+
+  const handleCloseEvent = () => {
+    setOpenedEvent(null);
+    setEventDetail(null);
   };
 
   const handleCreateOuting = (
@@ -613,6 +640,7 @@ const App = () => {
                 teams={allTeams}
                 busy={busy}
                 onStartOuting={handleStartOuting}
+                onOpenEvent={handleOpenEvent}
               />
 
               <Stack grow="fill" space="space.150">
@@ -620,6 +648,20 @@ const App = () => {
                 <HomeStats stats={stats} />
               </Stack>
             </Stack>
+
+            <EventDetailModal
+              summary={openedEvent}
+              detail={eventDetail}
+              teams={allTeams}
+              inPool={
+                openedEvent !== null &&
+                (restaurants ?? []).some(
+                  (restaurant) => restaurant.id === openedEvent.restaurantId,
+                )
+              }
+              busy={busy}
+              onClose={handleCloseEvent}
+            />
 
             <CreateOutingModal
               isOpen={createOutingOpen}
