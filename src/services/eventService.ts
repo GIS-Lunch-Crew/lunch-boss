@@ -5,6 +5,7 @@ import * as restaurantRepository from "../storage/restaurantRepository";
 import * as savedRestaurantRepository from "../storage/savedRestaurantRepository";
 import * as orderRepository from "../storage/orderRepository";
 import type {
+  AbandonEventResult,
   CreateEventInput,
   EventDetail,
   EventOrder,
@@ -304,25 +305,80 @@ export const updateEvent = async (
   }
 };
 
-// Delete is Lunch-Boss-only and allowed only when the outing has zero orders.
-// With orders present the boss steps down instead (later slice).
-export const deleteEvent = async (
+// Abandon bossdom — one smart action. With orders remaining the event goes
+// bossless (up for grabs / a post-time "I'm not placing this" signal); with
+// none it's deleted outright. The deleteMyOrder flag removes the boss's own
+// order first, then the same rule runs on what remains. Allowed any time
+// until placed (post-time abandon is deliberate); placed is terminal.
+export const abandonEvent = async (
   accountId: string,
   eventId: number,
-): Promise<void> => {
-  const event = await eventRepository.findById(eventId);
+  deleteMyOrder: boolean,
+): Promise<AbandonEventResult> => {
+  const event = await eventRepository.findDetailById(eventId, accountId);
   if (event === null) {
     throw new Error("Event not found.");
   }
-  if (event.hostAccountId !== accountId) {
-    throw new Error("Only the Lunch Boss can delete this event.");
+  if (event.placedAt !== null) {
+    throw new Error("These orders have already been placed.");
   }
-  const orderCount = await eventOrderRepository.countByEvent(eventId);
-  if (orderCount > 0) {
+  if (event.hostAccountId !== accountId) {
+    throw new Error("Only the Lunch Boss can abandon this event.");
+  }
+
+  if (deleteMyOrder) {
+    const myOrder = await eventOrderRepository.findByEventAndAccount(
+      eventId,
+      accountId,
+    );
+    if (myOrder !== null) {
+      await eventOrderRepository.remove(eventId, accountId);
+    }
+  }
+
+  const remaining = await eventOrderRepository.countByEvent(eventId);
+  if (remaining === 0) {
+    await eventTeamRepository.removeByEvent(eventId);
+    await eventRepository.remove(eventId);
+    return { outcome: "deleted" };
+  }
+
+  const cleared = await eventRepository.clearHost(eventId, accountId);
+  if (cleared === 0) {
+    // Raced: placed, or the host changed under us.
+    throw new Error("This event just changed — take another look and try again.");
+  }
+  return { outcome: "abandoned" };
+};
+
+// Claim a bossless event. Pre-time only (post-time the remedy is placement,
+// which any orderer can already do), and only for someone with a submitted
+// order. claimHost's conditional write means exactly one claimer wins.
+export const claimEvent = async (
+  accountId: string,
+  eventId: number,
+): Promise<void> => {
+  const event = await eventRepository.findDetailById(eventId, accountId);
+  if (event === null) {
+    throw new Error("Event not found.");
+  }
+  if (event.placedAt !== null) {
+    throw new Error("These orders have already been placed.");
+  }
+  if (toMs(event.scheduledAt) <= Date.now()) {
     throw new Error(
-      "This event already has orders and can't be deleted — step down instead.",
+      "This event's time has passed; bossdom can no longer be claimed.",
     );
   }
-  await eventTeamRepository.removeByEvent(eventId);
-  await eventRepository.remove(eventId);
+  const myOrder = await eventOrderRepository.findByEventAndAccount(
+    eventId,
+    accountId,
+  );
+  if (myOrder === null) {
+    throw new Error("Submit an order on this event first, then claim bossdom.");
+  }
+  const claimed = await eventRepository.claimHost(eventId, accountId);
+  if (claimed === 0) {
+    throw new Error("This event just changed — take another look and try again.");
+  }
 };

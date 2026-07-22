@@ -402,3 +402,31 @@ reading "Orders Placed."
 The Orders slice is complete: every control on the Event-detail page is wired.
 Remaining: slice 5 (step down / claim + time-change notice), slice 6 (polish);
 the boss's edit/delete UI still needs a home.
+
+### Commit 11 — Abandon / Claim Bossdom backend (delete folded into abandon)
+
+Slice 5, backend half. **Abandon is one smart action**: with orders remaining
+the event goes bossless (`host_account_id` → NULL — "up for grabs", and
+post-time it's the boss's "I'm not placing this, someone step up" signal);
+with zero orders the event is deleted outright. The `deleteMyOrder` flag
+removes the boss's own order first, then the same rule runs on what remains —
+so a boss who is the only orderer can withdraw-and-delete in one stroke.
+Abandon is allowed any time until placed (post-time abandon is deliberate);
+**claim is pre-time only** (post-time the remedy is placement, already open to
+any orderer) and requires a submitted order. Placed is terminal: `placed_at IS
+NULL` rides inside both conditional writes, so the DB arbitrates every race —
+first actor wins, losers get an error. `deleteEvent` is removed: it was never
+wired to any UI, and abandon-with-zero-orders now *is* delete — keeping both
+invites divergent semantics.
+
+| File | Purpose |
+| --- | --- |
+| `src/storage/eventRepository.ts` | `clearHost` (NULL the host `WHERE host_account_id = ? AND placed_at IS NULL`) and `claimHost` (set it `WHERE host_account_id IS NULL AND placed_at IS NULL`) — both return `affectedRows` (0 = lost the race), the `markPlaced` conditional-write pattern. |
+| `src/types/index.ts` | `AbandonEventResult` `{ outcome: "abandoned" \| "deleted" }` — the UI needs to know whether to refresh the modal or close it. |
+| `src/validation/eventSchemas.ts` | `abandonEventSchema` `{ eventId, deleteMyOrder? }`; claim reuses `eventIdSchema`. |
+| `src/services/eventService.ts` | `abandonEvent` (visibility → not-placed → boss-only → optional own-order delete → count: 0 = delete event + team rows, else `clearHost`); `claimEvent` (visibility → not-placed → pre-time → must-have-order → `claimHost`). `deleteEvent` removed. |
+| `src/resolvers/events.ts` | `abandonEvent`, `claimEvent` registered; `deleteEvent` unregistered. |
+
+No-order claimers get "Submit an order on this event first, then claim
+bossdom." — the card's always-active Claim button leans on this. UI (cards,
+boss area, Edit Details modal) lands next commit.

@@ -180,6 +180,12 @@ export type UpdateEventOrderInput = {
   notes?: string;
 };
 
+// What abandonEvent did: with orders remaining the event goes bossless
+// ("abandoned"); with none it's deleted. The UI refreshes or closes on this.
+export type AbandonEventResult = {
+  outcome: "abandoned" | "deleted";
+};
+
 // One person's in-flight order on an event (event_orders row). Same order
 // shape as CurrentSubmission; the restaurant lives on the event, not the row.
 export type EventOrder = {

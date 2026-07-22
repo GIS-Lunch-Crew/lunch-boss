@@ -1,5 +1,6 @@
 import type Resolver from "@forge/resolver";
 import {
+  abandonEventSchema,
   createEventSchema,
   eventIdSchema,
   getTodaysEventsSchema,
@@ -9,7 +10,12 @@ import {
 } from "../validation/eventSchemas";
 import * as eventService from "../services/eventService";
 import { requireAccountId } from "./context";
-import type { EventDetail, EventOrder, EventSummary } from "../types";
+import type {
+  AbandonEventResult,
+  EventDetail,
+  EventOrder,
+  EventSummary,
+} from "../types";
 
 export const registerEventResolvers = (resolver: Resolver): void => {
   resolver.define<unknown, EventSummary>(
@@ -44,11 +50,23 @@ export const registerEventResolvers = (resolver: Resolver): void => {
     },
   );
 
+  resolver.define<unknown, AbandonEventResult>(
+    "abandonEvent",
+    async ({ payload, context }) => {
+      const { eventId, deleteMyOrder } = abandonEventSchema.parse(payload);
+      return eventService.abandonEvent(
+        requireAccountId(context),
+        eventId,
+        deleteMyOrder ?? false,
+      );
+    },
+  );
+
   resolver.define<unknown, void>(
-    "deleteEvent",
+    "claimEvent",
     async ({ payload, context }) => {
       const { eventId } = eventIdSchema.parse(payload);
-      await eventService.deleteEvent(requireAccountId(context), eventId);
+      await eventService.claimEvent(requireAccountId(context), eventId);
     },
   );
 

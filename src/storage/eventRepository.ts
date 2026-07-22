@@ -146,6 +146,40 @@ export const insert = async (input: {
   return result.rows.insertId;
 };
 
+// Boss abandons bossdom: NULL the host only while the caller still IS the
+// host and the event isn't placed. 0 affected rows = raced (placed, or the
+// host already changed). Conditional-write pattern, like markPlaced.
+export const clearHost = async (
+  eventId: number,
+  accountId: string,
+): Promise<number> => {
+  const result = await sql
+    .prepare<UpdateQueryResponse>(
+      `UPDATE events SET host_account_id = NULL
+       WHERE id = ? AND host_account_id = ? AND placed_at IS NULL`,
+    )
+    .bindParams(eventId, accountId)
+    .execute();
+  return result.rows.affectedRows;
+};
+
+// Claim a bossless event: exactly one claimer's UPDATE can land while the
+// host is NULL and the event isn't placed. 0 = someone claimed first (or
+// placed).
+export const claimHost = async (
+  eventId: number,
+  accountId: string,
+): Promise<number> => {
+  const result = await sql
+    .prepare<UpdateQueryResponse>(
+      `UPDATE events SET host_account_id = ?
+       WHERE id = ? AND host_account_id IS NULL AND placed_at IS NULL`,
+    )
+    .bindParams(accountId, eventId)
+    .execute();
+  return result.rows.affectedRows;
+};
+
 // First-placer-wins gate: the `placed_at IS NULL` condition means exactly one
 // caller's UPDATE can land — everyone else affects 0 rows and reports "already
 // placed". (The conditional-write pattern; no transaction needed.)

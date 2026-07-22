@@ -42,6 +42,13 @@ export const submitEventOrderSchema = z.object({
   addToPool: z.boolean().optional(),
 });
 
+// deleteMyOrder: remove the boss's own order before the resign-or-delete rule
+// runs (claim reuses eventIdSchema).
+export const abandonEventSchema = z.object({
+  eventId: z.number().int().positive(),
+  deleteMyOrder: z.boolean().optional(),
+});
+
 export const updateEventOrderSchema = z.object({
   eventId: z.number().int().positive(),
   items: z.string().trim().max(2000).optional(),
