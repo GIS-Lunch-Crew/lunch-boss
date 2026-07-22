@@ -1,10 +1,15 @@
 import { z } from "zod";
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD");
+// Half-open UTC instant bounds ("YYYY-MM-DD HH:MM:SS"), computed on the client
+// from the picked local calendar day (see index.tsx). Compared directly against
+// ordered_at so "today" means the viewer's local day, not the DB clock's.
+const instant = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/, "Expected YYYY-MM-DD HH:MM:SS");
 
 export const getOrdersSchema = z.object({
-  from: isoDate.optional(),
-  to: isoDate.optional(),
+  from: instant.optional(),
+  to: instant.optional(),
 });
 
 export const submitOrderSchema = z.object({

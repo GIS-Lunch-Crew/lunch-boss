@@ -63,6 +63,21 @@ const parseTotal = (text: string): number | undefined | "invalid" => {
   return Number.isNaN(value) || value < 0 ? "invalid" : value;
 };
 
+// Order-history date filters. The picker deals in local calendar dates, but
+// ordered_at is a UTC instant, so we convert each picked local day into UTC
+// instant bounds and query the half-open range [from, to). This makes "today"
+// mean the viewer's local day regardless of the database clock.
+const toMysqlUtc = (date: Date): string =>
+  date.toISOString().slice(0, 19).replace("T", " ");
+const localDayStartUtc = (isoDate: string): string => {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return toMysqlUtc(new Date(y, m - 1, d));
+};
+const localDayEndUtc = (isoDate: string): string => {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return toMysqlUtc(new Date(y, m - 1, d + 1));
+};
+
 const App = () => {
   // null = pool still loading; undefined = submission still loading.
   const [restaurants, setRestaurants] = useState<Restaurant[] | null>(null);
@@ -146,9 +161,10 @@ const App = () => {
 
   const refreshOrders = useCallback(async () => {
     try {
-      setOrders(
-        unwrap(await invoke<PlacedOrder[]>("getOrders", { ...orderFilter })),
-      );
+      const params: { from?: string; to?: string } = {};
+      if (orderFilter.from) params.from = localDayStartUtc(orderFilter.from);
+      if (orderFilter.to) params.to = localDayEndUtc(orderFilter.to);
+      setOrders(unwrap(await invoke<PlacedOrder[]>("getOrders", params)));
     } catch (error) {
       setMessage({ appearance: "error", text: describeError(error) });
       setOrders([]);

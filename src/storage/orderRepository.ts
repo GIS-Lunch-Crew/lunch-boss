@@ -19,6 +19,11 @@ type OrderRow = Omit<PlacedOrder, "total"> & { total: string | number | null };
 
 // The restaurants JOIN intentionally ignores deleted_at: history must keep
 // showing a restaurant's name after it is soft-deleted.
+// `from`/`to` are half-open UTC instant bounds [from, to) — the range is
+// computed client-side from the picked local day. Comparing ordered_at
+// directly (not wrapped in DATE()) keeps the compare sargable so
+// idx_orders_account_ordered can serve the range, and avoids the old
+// DATE()-in-DB-clock straddle at midnight.
 export const listByAccount = async (
   accountId: string,
   from: string | undefined,
@@ -27,11 +32,11 @@ export const listByAccount = async (
   const conditions = ["o.account_id = ?"];
   const params: (string | number)[] = [accountId];
   if (from !== undefined) {
-    conditions.push("DATE(o.ordered_at) >= ?");
+    conditions.push("o.ordered_at >= ?");
     params.push(from);
   }
   if (to !== undefined) {
-    conditions.push("DATE(o.ordered_at) <= ?");
+    conditions.push("o.ordered_at < ?");
     params.push(to);
   }
 
