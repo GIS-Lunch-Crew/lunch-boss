@@ -77,10 +77,19 @@ undiscussed decision is out of scope until raised.
   would pollute the wheel — the NYC/LA case). The boss is the caller, so the
   existing `getSavedRestaurants` already returns the right pool — no new wheel
   plumbing.
-- **Restaurant change window**: while an outing has **zero orders**, the Lunch
-  Boss may change restaurant, time (later), and teams. Once **≥1 order** exists,
-  the restaurant can no longer be changed; time stays editable (later-only) and
-  teams stay editable.
+- **Restaurant is fixed at creation** — it is never edited. To use a different
+  restaurant, delete the outing (only possible with zero orders) and recreate.
+- **Editing an outing**: the Lunch Boss may edit the **time (later only)** and
+  the **teams (≥1)** at any time **before** the scheduled time. Editing has
+  nothing to do with orders. After the scheduled time the outing is frozen (no
+  edits).
+- **Deleting an outing**: boss-only, allowed **only when the outing has zero
+  orders** (the `event_orders` count check). With orders present, deletion is
+  blocked — the boss steps down instead (slice 5).
+- **Outing visibility**: an outing appears in a viewer's list when **any** of:
+  (a) they created it, (b) one of their teams is targeted, or (c) they have an
+  order on it. All three are queried; (c) simply can't be true until orders
+  exist (slice 3).
 - **After the scheduled time**: the only action is **Place all orders** — no new
   submissions, edits, or cancels. The order set is frozen.
 - **Placement**: anyone with an order on the outing can place it, after the
@@ -168,7 +177,9 @@ UI commit. This is purely commit ordering — the design/schema above is unchang
 2. **Start & see outings** — `events` + `event_teams`, create/read/edit backend,
    Home strip + create-outing UI. *(Demo: start an outing; a teammate sees it.)*
 3. **Order on an outing** — `event_orders`, submit/edit/cancel, detail + order
-   form + pool toggle. *(Demo: order on an outing.)*
+   form + pool toggle. Also: `getEvent` detail resolver, and **resurrect the
+   restaurant on order submission** (soft-deleted-restaurant race, like solo
+   `submitOrder`). *(Demo: order on an outing.)*
 4. **Place the batch** — `orders.event_id` + placement + place button.
    *(Demo: place; it lands in everyone's history.)*
 5. **Step down / claim + time-change notice** — depends on orders existing, so
@@ -223,3 +234,27 @@ team (dropdown) and creating/joining by name (text field) are separate controls.
 | --- | --- |
 | `src/frontend/components/TeamsPanel.tsx` | New. "My teams" list with Leave buttons; a join `Select` (only teams you're not already in); a "Create or join by name" `Textfield` + button (leans on `createTeam`'s create-or-join). |
 | `src/frontend/index.tsx` | `myTeams`/`allTeams` state; `refreshTeams` (parallel `getMyTeams` + `getTeams`) in the load effect; `handleCreateOrJoinByName` (message by outcome), `handleJoinTeam`, `handleLeaveTeam`; new Teams tab + panel. |
+
+### Commit 4 — Outings backend (create / read / edit / delete, no UI)
+
+Slice 2, backend half. An outing ("event") is one restaurant at one time,
+hosted by a Lunch Boss, visible to a chosen set of teams. Backend only — the
+outings UI is next. Also corrected the doc's edit/delete/visibility Design
+Decisions (restaurant is fixed at creation; edit = later-time + teams before
+the event time, frozen after; delete only at zero orders; visibility = created
+/ my-team / have-an-order). `event_orders` is created here (empty) so the delete
+guard and the "do I have an order?" visibility clause run now.
+
+| File | Purpose |
+| --- | --- |
+| `src/storage/migrations.ts` | `v009_create_events`, `v010_create_event_teams`, `v011_create_event_orders` (table only). |
+| `src/types/index.ts` | `EventSummary`, `CreateEventInput`, `UpdateEventInput`, `GetTodaysEventsInput`. |
+| `src/validation/eventSchemas.ts` | `createEventSchema`, `updateEventSchema`, `getTodaysEventsSchema`, `eventIdSchema`. |
+| `src/storage/eventRepository.ts` | `insert`, `listVisibleToday` (created-by-me / my-team / have-an-order), `findById`, `updateScheduledAt`, `remove`. |
+| `src/storage/eventTeamRepository.ts` | `saveMany`, `listByEvents`, `removeByEvent`, `setTeams` (PUT — add missing, drop removed). |
+| `src/storage/eventOrderRepository.ts` | `countByEvent` (delete guard; queried by visibility until order logic lands slice 3). |
+| `src/services/eventService.ts` | `createEvent` (future-time; no resurrect — deferred), `getTodaysEvents`, `updateEvent` (boss-only; later-time + teams; frozen after event time), `deleteEvent` (boss-only; zero orders). |
+| `src/resolvers/events.ts` | `createEvent`, `getTodaysEvents`, `updateEvent`, `deleteEvent`. |
+| `src/resolvers/index.ts` | Registered the event resolvers. |
+
+Deferred to slice 3: `getEvent` detail resolver; resurrect-on-order-submission.

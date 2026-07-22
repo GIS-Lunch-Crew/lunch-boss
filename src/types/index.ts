@@ -120,3 +120,42 @@ export type CreateTeamResult = {
   team: Team;
   outcome: CreateTeamOutcome;
 };
+
+// --- Outings / events (group ordering) ---
+
+// An outing in the day's list. Times are UTC instants ("YYYY-MM-DD HH:MM:SS"),
+// rendered locally by the frontend. teamIds are the teams the outing targets.
+// hostAccountId is the Lunch Boss (null = up for grabs). placedAt set = the
+// batch was placed.
+export type EventSummary = {
+  id: number;
+  hostAccountId: string | null;
+  createdBy: string;
+  restaurantId: number;
+  restaurantName: string;
+  scheduledAt: string;
+  originalScheduledAt: string;
+  placedAt: string | null;
+  teamIds: number[];
+};
+
+export type CreateEventInput = {
+  restaurantId: number;
+  scheduledAt: string; // UTC instant
+  teamIds: number[]; // ≥1
+};
+
+// Restaurant is fixed at creation, so it's not editable here. scheduledAt may
+// only move later (service-enforced); teamIds must stay ≥1 when provided.
+export type UpdateEventInput = {
+  eventId: number;
+  scheduledAt?: string;
+  teamIds?: number[];
+};
+
+// Half-open UTC instant bounds for the viewer's local "today" (same convention
+// as getOrders — computed client-side).
+export type GetTodaysEventsInput = {
+  from: string;
+  to: string;
+};
