@@ -339,7 +339,7 @@ const App = () => {
         teamIds,
       });
       setCreateOutingOpen(false);
-      setMessage({ appearance: "success", text: "Outing started." });
+      setMessage({ appearance: "success", text: "Event Created." });
       await refreshOutings();
     });
 

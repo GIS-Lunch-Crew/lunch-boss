@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  Box,
   Button,
   CheckboxGroup,
   DatePicker,
@@ -17,8 +18,20 @@ import {
   Stack,
   Text,
   TimePicker,
+  xcss,
 } from "@forge/react";
 import type { Restaurant, Team } from "../../types";
+
+const timeWidth = xcss({ width: "150px" });
+const dateWidth = xcss({ width: "150px" });
+
+// Half-hour slots across the full 24h (00:00–23:30) — outings aren't limited to
+// work hours.
+const HALF_HOUR_TIMES = Array.from({ length: 48 }, (_, i) => {
+  const hour = String(Math.floor(i / 2)).padStart(2, "0");
+  const minute = i % 2 === 0 ? "00" : "30";
+  return `${hour}:${minute}`;
+});
 
 type Props = {
   isOpen: boolean;
@@ -76,7 +89,7 @@ const CreateOutingModal = ({
         <Modal>
           <ModalHeader>
             <Inline grow="fill" spread="space-between" alignBlock="center">
-              <ModalTitle>Start an outing</ModalTitle>
+              <ModalTitle>Be a Lunch Boss</ModalTitle>
               <Pressable onClick={onCancel} isDisabled={busy}>
                 <Icon glyph="cross" label="Close" />
               </Pressable>
@@ -102,32 +115,41 @@ const CreateOutingModal = ({
               <Inline space="space.150" shouldWrap>
                 <Stack space="space.050">
                   <Label labelFor="outingDate">Date</Label>
-                  <DatePicker
-                    id="outingDate"
-                    minDate={todayDate}
-                    onChange={(value) => setDate(value)}
-                  />
+                  <Box xcss={dateWidth}>
+                    <DatePicker
+                      id="outingDate"
+                      minDate={todayDate}
+                      placeholder={todayDate}
+                      onChange={(value) => setDate(value)}
+                    />
+                  </Box>
                 </Stack>
                 <Stack space="space.050">
                   <Label labelFor="outingTime">Time</Label>
-                  <TimePicker
-                    id="outingTime"
-                    timeFormat="HH:mm"
-                    timeIsEditable
-                    onChange={(value) => setTime(value)}
-                  />
+                  <Box xcss={timeWidth}>
+                    <TimePicker
+                      id="outingTime"
+                      timeFormat="HH:mm"
+                      times={HALF_HOUR_TIMES}
+                      placeholder="13:30"
+                      timeIsEditable
+                      onChange={(value) => setTime(value)}
+                    />
+                  </Box>
                 </Stack>
               </Inline>
               <Stack space="space.050">
                 <Label labelFor="outingTeams">Visible to teams</Label>
                 {teamOptions.length === 0 ? (
-                  <Text>Join a team first to start an outing.</Text>
+                  <Text>Join a team first to create an event.</Text>
                 ) : (
                   <CheckboxGroup
                     name="outingTeams"
                     options={teamOptions}
                     value={teamIds}
-                    onChange={(values) => setTeamIds((values as string[]) ?? [])}
+                    onChange={(values) =>
+                      setTeamIds((values as string[]) ?? [])
+                    }
                   />
                 )}
               </Stack>
@@ -144,7 +166,7 @@ const CreateOutingModal = ({
                   }
                 }}
               >
-                Start outing
+                Be the Boss
               </Button>
               <Button appearance="subtle" isDisabled={busy} onClick={onCancel}>
                 Cancel

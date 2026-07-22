@@ -34,10 +34,16 @@ const cardStyle = xcss({
   backgroundColor: "elevation.surface",
 });
 
-// Stored UTC instant ("YYYY-MM-DD HH:MM:SS") → the viewer's local time.
+// Stored UTC instant ("YYYY-MM-DD HH:MM:SS") → the viewer's local time, to the
+// minute (no seconds).
 const formatInstant = (value: string): string => {
   const date = new Date(`${value.replace(" ", "T")}Z`);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
 };
 
 const OutingsSection = ({ events, teams, busy, onStartOuting }: Props) => {
@@ -47,15 +53,15 @@ const OutingsSection = ({ events, teams, busy, onStartOuting }: Props) => {
   return (
     <Stack grow="fill" space="space.150">
       <Inline spread="space-between" alignBlock="center">
-        <Heading as="h2">Today's outings</Heading>
+        <Heading as="h2">Today's Events</Heading>
         <Button appearance="primary" isDisabled={busy} onClick={onStartOuting}>
-          Start an outing
+          Be a Lunch Boss
         </Button>
       </Inline>
       {events === null ? (
-        <Spinner label="Loading outings" />
+        <Spinner label="Loading events" />
       ) : events.length === 0 ? (
-        <Text>No outings today yet — start one!</Text>
+        <Text>No events today yet — be a Lunch Boss!</Text>
       ) : (
         <Box xcss={scrollRow}>
           <Inline space="space.150" alignBlock="start">

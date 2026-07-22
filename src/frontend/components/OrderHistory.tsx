@@ -40,7 +40,12 @@ const head = {
 // as local and show the raw UTC wall-clock).
 const formatDate = (value: string): string => {
   const date = new Date(`${value.replace(" ", "T")}Z`);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
 };
 
 // Local date as YYYY-MM-DD for the "Today" shortcut. The parent converts this
@@ -98,6 +103,7 @@ const OrderHistory = ({
           <DatePicker
             id="historyFrom"
             defaultValue={from}
+            placeholder={todayLocal()}
             onChange={(value) => onFilterChange(value || undefined, to)}
           />
         </Stack>
@@ -106,6 +112,7 @@ const OrderHistory = ({
           <DatePicker
             id="historyTo"
             defaultValue={to}
+            placeholder={todayLocal()}
             onChange={(value) => onFilterChange(from, value || undefined)}
           />
         </Stack>
