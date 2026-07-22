@@ -23,11 +23,14 @@ import RestaurantFormModal from "./components/RestaurantFormModal";
 import type { RestaurantFields } from "./components/RestaurantForm";
 import RestaurantTable from "./components/RestaurantTable";
 import TeamsPanel from "./components/TeamsPanel";
+import OutingsSection from "./components/OutingsSection";
+import CreateOutingModal from "./components/CreateOutingModal";
 import type {
   AddRestaurantResult,
   CreateTeamResult,
   CurrentSubmission,
   CurrentSubmissionResult,
+  EventSummary,
   OrderStats,
   PlacedOrder,
   Restaurant,
@@ -81,6 +84,25 @@ const localDayEndUtc = (isoDate: string): string => {
   return toMysqlUtc(new Date(y, m - 1, d + 1));
 };
 
+// Today as a local YYYY-MM-DD (for the outing date picker + today's-outings
+// bounds).
+const todayLocalDate = (): string => {
+  const now = new Date();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${m}-${d}`;
+};
+
+// A picked local date ("YYYY-MM-DD") + time ("HH:mm", trailing seconds/zone
+// tolerated) → a UTC instant string for the backend.
+const localDateTimeToUtc = (date: string, time: string): string => {
+  const [y, mo, d] = date.split("-").map(Number);
+  const match = time.match(/^(\d{1,2}):(\d{2})/);
+  const h = match ? Number(match[1]) : 0;
+  const mi = match ? Number(match[2]) : 0;
+  return toMysqlUtc(new Date(y, mo - 1, d, h, mi, 0, 0));
+};
+
 const App = () => {
   // null = pool still loading; undefined = submission still loading.
   const [restaurants, setRestaurants] = useState<Restaurant[] | null>(null);
@@ -117,6 +139,10 @@ const App = () => {
   // (powers the join dropdown). null = still loading.
   const [myTeams, setMyTeams] = useState<Team[] | null>(null);
   const [allTeams, setAllTeams] = useState<Team[] | null>(null);
+  // Today's outings visible to the caller. null = still loading. Named
+  // `outings` (not `events`) to avoid colliding with the bridge Events API.
+  const [outings, setOutings] = useState<EventSummary[] | null>(null);
+  const [createOutingOpen, setCreateOutingOpen] = useState(false);
   // Not persisted; always resets to Home on load.
   const [activeTab, setActiveTab] = useState(0);
 
@@ -165,11 +191,29 @@ const App = () => {
     }
   }, []);
 
+  const refreshOutings = useCallback(async () => {
+    try {
+      const today = todayLocalDate();
+      setOutings(
+        unwrap(
+          await invoke<EventSummary[]>("getTodaysEvents", {
+            from: localDayStartUtc(today),
+            to: localDayEndUtc(today),
+          }),
+        ),
+      );
+    } catch (error) {
+      setMessage({ appearance: "error", text: describeError(error) });
+      setOutings([]);
+    }
+  }, []);
+
   useEffect(() => {
     refresh();
     refreshSubmission();
     refreshStats();
     refreshTeams();
+    refreshOutings();
     view
       .getContext()
       .then((context) => setEnvironmentType(context.environmentType));
@@ -180,7 +224,7 @@ const App = () => {
         setDisplayName(user.displayName ?? null),
       )
       .catch(() => setDisplayName(null));
-  }, [refresh, refreshSubmission, refreshStats, refreshTeams]);
+  }, [refresh, refreshSubmission, refreshStats, refreshTeams, refreshOutings]);
 
   const refreshOrders = useCallback(async () => {
     try {
@@ -274,6 +318,29 @@ const App = () => {
       await invoke("leaveTeam", { teamId });
       setMessage({ appearance: "information", text: "Left team." });
       await refreshTeams();
+    });
+
+  // --- Outings ---
+  const handleStartOuting = () => {
+    setMessage(null);
+    setCreateOutingOpen(true);
+  };
+
+  const handleCreateOuting = (
+    restaurantId: number,
+    date: string,
+    time: string,
+    teamIds: number[],
+  ) =>
+    runAction(async () => {
+      await invoke<EventSummary>("createEvent", {
+        restaurantId,
+        scheduledAt: localDateTimeToUtc(date, time),
+        teamIds,
+      });
+      setCreateOutingOpen(false);
+      setMessage({ appearance: "success", text: "Outing started." });
+      await refreshOutings();
     });
 
   // --- Order lifecycle (CONTEXT.md §3.12) ---
@@ -515,11 +582,28 @@ const App = () => {
                 />
               </Stack>
 
+              <OutingsSection
+                events={outings}
+                teams={allTeams}
+                busy={busy}
+                onStartOuting={handleStartOuting}
+              />
+
               <Stack grow="fill" space="space.150">
                 <Heading as="h2">Stats</Heading>
                 <HomeStats stats={stats} />
               </Stack>
             </Stack>
+
+            <CreateOutingModal
+              isOpen={createOutingOpen}
+              restaurants={restaurants}
+              teams={myTeams}
+              busy={busy}
+              todayDate={todayLocalDate()}
+              onCreate={handleCreateOuting}
+              onCancel={() => setCreateOutingOpen(false)}
+            />
           </Box>
         </TabPanel>
 

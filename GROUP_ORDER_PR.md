@@ -258,3 +258,18 @@ guard and the "do I have an order?" visibility clause run now.
 | `src/resolvers/index.ts` | Registered the event resolvers. |
 
 Deferred to slice 3: `getEvent` detail resolver; resurrect-on-order-submission.
+
+### Commit 5 — Outings UI: today's strip + create (slice 2 demoable)
+
+Slice 2, UI half — completes the slice. Home gains a "Today's outings" strip and
+a "Start an outing" modal. Outings can be created for any future day; the strip
+shows today's. Edit/delete land next.
+
+| File | Purpose |
+| --- | --- |
+| `src/frontend/components/OutingsSection.tsx` | New. "Today's outings" heading + "Start an outing" button + horizontal-scroll cards (restaurant, local time, Lunch Boss via `User`, team names via `allTeams`). |
+| `src/frontend/components/CreateOutingModal.tsx` | New. Restaurant `Select` (your pool), `DatePicker` + `TimePicker`, `CheckboxGroup` of your teams; parent combines date + time into a UTC instant. |
+| `src/frontend/index.tsx` | `outings`/`createOutingOpen` state; `refreshOutings` (today's local-day bounds); `todayLocalDate` + `localDateTimeToUtc` helpers; `handleStartOuting`/`handleCreateOuting`; Home render (Current order → Today's outings → Stats) + modal. |
+
+Notes: state is named `outings` (not `events`) to avoid colliding with the
+bridge Events-API import; `TimePicker` is a Preview component.
