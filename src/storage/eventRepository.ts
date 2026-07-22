@@ -146,6 +146,19 @@ export const insert = async (input: {
   return result.rows.insertId;
 };
 
+// First-placer-wins gate: the `placed_at IS NULL` condition means exactly one
+// caller's UPDATE can land — everyone else affects 0 rows and reports "already
+// placed". (The conditional-write pattern; no transaction needed.)
+export const markPlaced = async (id: number): Promise<number> => {
+  const result = await sql
+    .prepare<UpdateQueryResponse>(
+      "UPDATE events SET placed_at = CURRENT_TIMESTAMP WHERE id = ? AND placed_at IS NULL",
+    )
+    .bindParams(id)
+    .execute();
+  return result.rows.affectedRows;
+};
+
 export const updateScheduledAt = async (
   id: number,
   scheduledAt: string,

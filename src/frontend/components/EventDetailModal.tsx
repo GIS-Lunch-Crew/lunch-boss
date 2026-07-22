@@ -47,6 +47,7 @@ type Props = {
     notesText: string,
   ) => Promise<boolean>;
   onCancelOrder: () => void;
+  onPlaceOrders: () => void;
 };
 
 // Stored UTC instant ("YYYY-MM-DD HH:MM:SS") → the viewer's local time, to the
@@ -68,8 +69,7 @@ const toMs = (instant: string): number =>
 // form; restaurant + time (large); team names; the restaurant's contact
 // fields; the table of everyone's orders with Place All Orders at its top.
 //
-// The order form is wired (submit/edit/cancel); Place All Orders is still
-// inert until the placement commit.
+// Fully wired: the order form (submit/edit/cancel) and Place All Orders.
 const EventDetailModal = ({
   summary,
   detail,
@@ -80,6 +80,7 @@ const EventDetailModal = ({
   onSubmitOrder,
   onSaveOrder,
   onCancelOrder,
+  onPlaceOrders,
 }: Props) => {
   if (summary === null) {
     return <ModalTransition>{null}</ModalTransition>;
@@ -194,11 +195,10 @@ const EventDetailModal = ({
             <Stack space="space.100">
               <Inline spread="space-between" alignBlock="center">
                 <Heading as="h3">Orders</Heading>
-                {/* Inert until the Orders slice wires placeEventOrders. */}
                 <Button
                   appearance="primary"
                   isDisabled={!canPlace}
-                  onClick={() => {}}
+                  onClick={onPlaceOrders}
                 >
                   {placed ? "Orders Placed" : "Place All Orders"}
                 </Button>

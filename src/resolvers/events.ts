@@ -75,4 +75,12 @@ export const registerEventResolvers = (resolver: Resolver): void => {
       await eventService.cancelEventOrder(requireAccountId(context), eventId);
     },
   );
+
+  resolver.define<unknown, void>(
+    "placeEventOrders",
+    async ({ payload, context }) => {
+      const { eventId } = eventIdSchema.parse(payload);
+      await eventService.placeEventOrders(requireAccountId(context), eventId);
+    },
+  );
 };

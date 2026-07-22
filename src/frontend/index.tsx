@@ -452,6 +452,23 @@ const App = () => {
     });
   };
 
+  const handlePlaceEventOrders = () => {
+    if (!openedEvent) {
+      return;
+    }
+    return runAction(async () => {
+      await invoke("placeEventOrders", { eventId: openedEvent.id });
+      setMessage({ appearance: "success", text: "Orders placed." });
+      // The re-fetch flips the button to "Orders Placed" and shows the
+      // preserved table; losing the race surfaces the service error instead,
+      // and the same re-fetch in the next open shows who won.
+      await refreshEventDetail(openedEvent.id);
+      // The caller's own history gained a row.
+      await refreshOrders();
+      await refreshStats();
+    });
+  };
+
   const handleCreateOuting = (
     restaurantId: number,
     date: string,
@@ -749,6 +766,7 @@ const App = () => {
               onSubmitOrder={handleSubmitEventOrder}
               onSaveOrder={handleSaveEventOrder}
               onCancelOrder={handleCancelEventOrder}
+              onPlaceOrders={handlePlaceEventOrders}
             />
 
             <CreateOutingModal

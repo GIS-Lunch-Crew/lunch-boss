@@ -124,6 +124,12 @@ CREATE TABLE IF NOT EXISTS event_orders (
   KEY idx_event_orders_account (account_id)
 )`;
 
+// NULL = a solo order; set = the event this order was batch-placed from.
+// Lets history show group context and lets us query orders by team / Lunch
+// Boss / date transitively through the event.
+const ADD_EVENT_ID_TO_ORDERS = `
+ALTER TABLE orders ADD COLUMN event_id INT NULL`;
+
 const migrations = migrationRunner
   .enqueue('v001_create_restaurants', CREATE_RESTAURANTS)
   .enqueue('v002_create_user_saved_restaurants', CREATE_USER_SAVED_RESTAURANTS)
@@ -135,7 +141,8 @@ const migrations = migrationRunner
   .enqueue('v008_create_team_members', CREATE_TEAM_MEMBERS)
   .enqueue('v009_create_events', CREATE_EVENTS)
   .enqueue('v010_create_event_teams', CREATE_EVENT_TEAMS)
-  .enqueue('v011_create_event_orders', CREATE_EVENT_ORDERS);
+  .enqueue('v011_create_event_orders', CREATE_EVENT_ORDERS)
+  .enqueue('v012_add_event_id_to_orders', ADD_EVENT_ID_TO_ORDERS);
 
 export const applyMigrations = async (): Promise<string[]> => {
   const applied = await migrations.run();

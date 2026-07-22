@@ -3,6 +3,7 @@ import * as eventTeamRepository from "../storage/eventTeamRepository";
 import * as eventOrderRepository from "../storage/eventOrderRepository";
 import * as restaurantRepository from "../storage/restaurantRepository";
 import * as savedRestaurantRepository from "../storage/savedRestaurantRepository";
+import * as orderRepository from "../storage/orderRepository";
 import type {
   CreateEventInput,
   EventDetail,
@@ -227,6 +228,48 @@ export const cancelEventOrder = async (
     throw new Error("No order on this event to cancel.");
   }
   await eventOrderRepository.remove(eventId, accountId);
+};
+
+// Place the whole batch into every participant's history. Anyone with a
+// submitted order on the event can place it, only after the event's time.
+// First placer wins: markPlaced's conditional write lands for exactly one
+// caller. event_orders rows are NOT deleted — the event stays viewable in its
+// preserved, placed state. The fresh listByEvent here is the real staleness
+// guarantee (the order set is read server-side at placement time).
+export const placeEventOrders = async (
+  accountId: string,
+  eventId: number,
+): Promise<void> => {
+  const event = await eventRepository.findDetailById(eventId, accountId);
+  if (event === null) {
+    throw new Error("Event not found.");
+  }
+  if (toMs(event.scheduledAt) > Date.now()) {
+    throw new Error("This event's time hasn't arrived yet.");
+  }
+  const orders = await eventOrderRepository.listByEvent(eventId);
+  if (!orders.some((order) => order.accountId === accountId)) {
+    throw new Error(
+      "Only someone with an order on this event can place its orders.",
+    );
+  }
+
+  // Win the race before writing history: a mid-failure after markPlaced can
+  // leave the batch unwritten, but can never double-place it.
+  const won = await eventRepository.markPlaced(eventId);
+  if (won === 0) {
+    throw new Error("These orders have already been placed.");
+  }
+  await orderRepository.insertMany(
+    orders.map((order) => ({
+      accountId: order.accountId,
+      restaurantId: event.restaurantId,
+      items: order.items,
+      total: order.total,
+      notes: order.notes,
+      eventId,
+    })),
+  );
 };
 
 // Edit is Lunch-Boss-only and allowed only before the outing's time (frozen

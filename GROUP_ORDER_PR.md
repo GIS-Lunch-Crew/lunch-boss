@@ -374,3 +374,31 @@ real row.
 
 Place All Orders remains inert — next commit: `orders.event_id` (v012),
 first-placer-wins placement, and wiring that one button.
+
+### Commit 10 — Place Event Orders (batch placement, first-placer-wins)
+
+Orders-slice commit 2 of 2 — the last inert control goes live. Anyone with a
+submitted order on the event can place the batch, only after the event's time;
+one history row lands per participant with `event_id` set and `ordered_at` =
+the placement moment (solo-like). First placer wins via the conditional write
+on `events.placed_at` (`WHERE placed_at IS NULL` — exactly one caller's UPDATE
+affects a row; the loser gets "These orders have already been placed."), and
+`markPlaced` runs **before** the history insert so a mid-failure can never
+double-place. The order set is read fresh server-side at placement time (the
+real no-stale-orders guarantee). `event_orders` rows are NOT deleted — the
+event stays viewable in its preserved, placed state, with the button disabled
+reading "Orders Placed."
+
+| File | Purpose |
+| --- | --- |
+| `src/storage/migrations.ts` | `v012_add_event_id_to_orders` — `ALTER TABLE orders ADD COLUMN event_id INT NULL` (append-only; `NULL` = solo order). |
+| `src/storage/orderRepository.ts` | `insertMany` — one multi-row INSERT of the batch (account, the event's restaurant, items/total/notes, `event_id`); `ordered_at` takes the table's CURRENT_TIMESTAMP default. Solo `insert` untouched. |
+| `src/storage/eventRepository.ts` | `markPlaced` — the conditional `placed_at` UPDATE returning `affectedRows` (0 = lost the race). |
+| `src/services/eventService.ts` | `placeEventOrders` — visibility via `findDetailById` → time-has-passed check → fresh `listByEvent` + caller-has-an-order check → `markPlaced` (0 rows → already placed) → `insertMany`. |
+| `src/resolvers/events.ts` | `placeEventOrders` (reuses `eventIdSchema`). |
+| `src/frontend/components/EventDetailModal.tsx` | Place All Orders takes the real `onPlaceOrders` handler (enable logic unchanged from commit 8). |
+| `src/frontend/index.tsx` | `handlePlaceEventOrders` via `runAction`: invoke, "Orders placed." message, re-fetch the open event (button flips to "Orders Placed", table preserved), then `refreshOrders()` + `refreshStats()` (the caller's history gained a row). A lost race surfaces the service error via the shared banner. |
+
+The Orders slice is complete: every control on the Event-detail page is wired.
+Remaining: slice 5 (step down / claim + time-change notice), slice 6 (polish);
+the boss's edit/delete UI still needs a home.

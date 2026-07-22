@@ -121,3 +121,37 @@ export const insert = async (
 
   return result.rows.insertId;
 };
+
+// Batch placement from an event: one history row per participant, all with
+// event_id set. One multi-row INSERT; ordered_at takes the table default
+// (CURRENT_TIMESTAMP — the placement moment, like solo).
+export const insertMany = async (
+  rows: {
+    accountId: string;
+    restaurantId: number;
+    items: string | null;
+    total: number | null;
+    notes: string | null;
+    eventId: number;
+  }[],
+): Promise<void> => {
+  if (rows.length === 0) {
+    return;
+  }
+  const placeholders = rows.map(() => "(?, ?, ?, ?, ?, ?)").join(", ");
+  const params = rows.flatMap((row) => [
+    row.accountId,
+    row.restaurantId,
+    row.items,
+    row.total,
+    row.notes,
+    row.eventId,
+  ]);
+  await sql
+    .prepare<UpdateQueryResponse>(
+      `INSERT INTO orders (account_id, restaurant_id, items, total, notes, event_id)
+       VALUES ${placeholders}`,
+    )
+    .bindParams(...params)
+    .execute();
+};
