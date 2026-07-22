@@ -460,16 +460,16 @@ const App = () => {
     });
   };
 
-  // Claim works from a card or the open detail page; the strip always
-  // refreshes, the detail only if it's the open event.
+  // Claim works from a card or the open detail page. A card claim also
+  // bubbles into the card's open-press (no stopPropagation in UI Kit), so
+  // the page opens alongside — refresh the detail unconditionally so the
+  // freshly claimed state always wins over the bubble's earlier getEvent.
   const handleClaimEvent = (event: EventSummary) =>
     runAction(async () => {
       await invoke("claimEvent", { eventId: event.id });
       setMessage({ appearance: "success", text: "You are now the Lunch Boss." });
       await refreshOutings();
-      if (openedEvent?.id === event.id) {
-        await refreshEventDetail(event.id);
-      }
+      await refreshEventDetail(event.id);
     });
 
   const handleAbandonEvent = (deleteMyOrder: boolean) => {
