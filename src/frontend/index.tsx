@@ -103,6 +103,27 @@ const todayLocalDate = (): string => {
   return `${now.getFullYear()}-${m}-${d}`;
 };
 
+// The Create Outing modal's default date+time: today + the next half-hour
+// slot from HALF_HOUR_TIMES (11:15 -> 11:30, 11:30 stays 11:30). Past 23:30
+// there's no slot left today, so it rolls the date to tomorrow at 00:00.
+const nextAvailableSlot = (): { date: string; time: string } => {
+  const now = new Date();
+  const totalMinutes = now.getHours() * 60 + now.getMinutes();
+  const roundedUp = Math.ceil(totalMinutes / 30) * 30;
+  const rollsToTomorrow = roundedUp >= 24 * 60;
+  const wrapped = roundedUp % (24 * 60);
+  const hour = String(Math.floor(wrapped / 60)).padStart(2, "0");
+  const minute = String(wrapped % 60).padStart(2, "0");
+  const time = `${hour}:${minute}`;
+  if (!rollsToTomorrow) {
+    return { date: todayLocalDate(), time };
+  }
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const m = String(tomorrow.getMonth() + 1).padStart(2, "0");
+  const d = String(tomorrow.getDate()).padStart(2, "0");
+  return { date: `${tomorrow.getFullYear()}-${m}-${d}`, time };
+};
+
 // A picked local date ("YYYY-MM-DD") + time ("HH:mm", trailing seconds/zone
 // tolerated) → a UTC instant string for the backend.
 const localDateTimeToUtc = (date: string, time: string): string => {
@@ -751,6 +772,7 @@ const App = () => {
     setEditing(null);
     setAddModalOpen(false);
   };
+  const outingDefaultSlot = nextAvailableSlot();
 
   return (
     <Stack grow="fill" space="space.300">
@@ -863,6 +885,8 @@ const App = () => {
               teams={myTeams}
               busy={busy}
               todayDate={todayLocalDate()}
+              defaultDate={outingDefaultSlot.date}
+              earliestTimeToday={outingDefaultSlot.time}
               wheelWinner={createEventWheelWinner}
               onOpenWheel={handleOpenCreateWheel}
               onCreate={handleCreateOuting}
