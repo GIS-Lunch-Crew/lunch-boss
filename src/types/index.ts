@@ -137,6 +137,9 @@ export type EventSummary = {
   originalScheduledAt: string;
   placedAt: string | null;
   teamIds: number[];
+  // Whether the caller has a submitted order on this event — drives the
+  // Today's Events row's green-border highlight.
+  hasMyOrder: boolean;
 };
 
 export type CreateEventInput = {

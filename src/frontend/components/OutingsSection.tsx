@@ -36,15 +36,18 @@ const scrollRow = xcss({ overflow: "auto" });
 // area stays clickable via an inner Pressable.
 // The card box draws the border only — padding lives INSIDE the press areas
 // so the click range reaches the drawn border with no dead rim.
-const cardStyle = xcss({
-  minWidth: "280px",
-  minHeight: "160px",
-  borderColor: "color.border.bold",
-  borderWidth: "border.width.selected",
-  borderStyle: "solid",
-  borderRadius: "radius.small",
-  backgroundColor: "elevation.surface",
-});
+const cardStyle = (event: EventSummary) =>
+  xcss({
+    minWidth: "280px",
+    minHeight: "160px",
+    borderColor: event.hasMyOrder
+      ? "color.border.success"
+      : "color.border.bold",
+    borderWidth: "border.width.selected",
+    borderStyle: "solid",
+    borderRadius: "radius.small",
+    backgroundColor: "elevation.surface",
+  });
 // Bossed card: ONE press area covering the whole card. `height: 100%` makes
 // it fill the stretched card box, so a shorter card is clickable to its
 // bottom border, not just to where its content stops. Padding lives on the
@@ -184,7 +187,7 @@ const OutingsSection = ({
               // stopPropagation), so a claim may open the event page too —
               // by design, that shows the freshly claimed state.
               return (
-                <Box key={event.id} xcss={cardStyle}>
+                <Box key={event.id} xcss={cardStyle(event)}>
                   <Pressable
                     xcss={pressableCardStyle}
                     isDisabled={busy}
