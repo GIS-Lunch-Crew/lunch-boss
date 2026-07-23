@@ -24,6 +24,7 @@ import type { RestaurantFields } from "./components/RestaurantForm";
 import RestaurantTable from "./components/RestaurantTable";
 import TeamsPanel from "./components/TeamsPanel";
 import OutingsSection from "./components/OutingsSection";
+import EventsCalendar, { localDateKey } from "./components/EventsCalendar";
 import CreateOutingModal from "./components/CreateOutingModal";
 import EventDetailModal from "./components/EventDetailModal";
 import EditEventModal from "./components/EditEventModal";
@@ -198,6 +199,24 @@ const App = () => {
   // `outings` (not `events`) to avoid colliding with the bridge Events API.
   const [outings, setOutings] = useState<EventSummary[] | null>(null);
   const [createOutingOpen, setCreateOutingOpen] = useState(false);
+  // Calendar tab: the displayed month (viewer-local), that month's visible
+  // events (null = loading), and the day whose strip shows under the grid.
+  const [calMonth, setCalMonth] = useState<{ year: number; month: number }>(
+    () => {
+      const now = new Date();
+      return { year: now.getFullYear(), month: now.getMonth() + 1 };
+    },
+  );
+  const [calEvents, setCalEvents] = useState<EventSummary[] | null>(null);
+  const [calSelectedDate, setCalSelectedDate] = useState<string | null>(() =>
+    todayLocalDate(),
+  );
+  // Create-modal date override — set when "Be a Lunch Boss" is pressed from
+  // a Calendar day strip so the modal defaults to that day; null = Home's
+  // usual next-available-slot default.
+  const [outingDefaultDate, setOutingDefaultDate] = useState<string | null>(
+    null,
+  );
   // The card the user clicked (null = detail page closed) and its full detail
   // from getEvent (null = still loading). The summary seeds the instant paint.
   const [openedEvent, setOpenedEvent] = useState<EventSummary | null>(null);
@@ -271,6 +290,37 @@ const App = () => {
       setOutings([]);
     }
   }, []);
+
+  // The Calendar month is just a wider window through the same resolver the
+  // Home strip uses — [first local day of month, first local day of next
+  // month), so visibility rules match exactly.
+  const refreshCalendar = useCallback(async () => {
+    try {
+      const first = `${calMonth.year}-${String(calMonth.month).padStart(2, "0")}-01`;
+      const next =
+        calMonth.month === 12
+          ? { year: calMonth.year + 1, month: 1 }
+          : { year: calMonth.year, month: calMonth.month + 1 };
+      const nextFirst = `${next.year}-${String(next.month).padStart(2, "0")}-01`;
+      setCalEvents(
+        unwrap(
+          await invoke<EventSummary[]>("getTodaysEvents", {
+            from: localDayStartUtc(first),
+            to: localDayStartUtc(nextFirst),
+          }),
+        ),
+      );
+    } catch (error) {
+      setMessage({ appearance: "error", text: describeError(error) });
+      setCalEvents([]);
+    }
+  }, [calMonth]);
+
+  // Own effect so month navigation refetches without re-running the boot
+  // fetches above.
+  useEffect(() => {
+    refreshCalendar();
+  }, [refreshCalendar]);
 
   useEffect(() => {
     refresh();
@@ -388,7 +438,35 @@ const App = () => {
   // --- Outings ---
   const handleStartOuting = () => {
     setMessage(null);
+    setOutingDefaultDate(null);
     setCreateOutingOpen(true);
+  };
+
+  // Calendar-strip variant: the create modal defaults to the selected day.
+  const handleStartOutingForDate = (date: string) => {
+    setMessage(null);
+    setOutingDefaultDate(date);
+    setCreateOutingOpen(true);
+  };
+
+  const handleCalPrevMonth = () => {
+    setCalSelectedDate(null);
+    setCalEvents(null);
+    setCalMonth((prev) =>
+      prev.month === 1
+        ? { year: prev.year - 1, month: 12 }
+        : { year: prev.year, month: prev.month - 1 },
+    );
+  };
+
+  const handleCalNextMonth = () => {
+    setCalSelectedDate(null);
+    setCalEvents(null);
+    setCalMonth((prev) =>
+      prev.month === 12
+        ? { year: prev.year + 1, month: 1 }
+        : { year: prev.year, month: prev.month + 1 },
+    );
   };
 
   // Tag the next wheel result for the create panel before its Frame mounts, so
@@ -410,6 +488,7 @@ const App = () => {
         setMessage({ appearance: "error", text: describeError(error) });
         setOpenedEvent(null);
         refreshOutings();
+        refreshCalendar();
       });
   };
 
@@ -458,6 +537,7 @@ const App = () => {
         await refresh();
       }
       await refreshOutings();
+      await refreshCalendar();
     });
   };
 
@@ -497,8 +577,9 @@ const App = () => {
       await invoke("cancelEventOrder", { eventId: openedEvent.id });
       setMessage({ appearance: "information", text: "Order canceled." });
       await refreshEventDetail(openedEvent.id);
-      // Losing the order can change strip visibility.
+      // Losing the order can change strip/calendar visibility.
       await refreshOutings();
+      await refreshCalendar();
     });
   };
 
@@ -514,6 +595,7 @@ const App = () => {
         text: "You are now the Lunch Boss.",
       });
       await refreshOutings();
+      await refreshCalendar();
       await refreshEventDetail(event.id);
     });
 
@@ -540,6 +622,7 @@ const App = () => {
             : "Bossdom abandoned.",
       });
       await refreshOutings();
+      await refreshCalendar();
     });
   };
 
@@ -561,6 +644,7 @@ const App = () => {
       setMessage({ appearance: "success", text: "Event updated." });
       await refreshEventDetail(openedEvent.id);
       await refreshOutings();
+      await refreshCalendar();
     });
   };
 
@@ -575,9 +659,11 @@ const App = () => {
       // preserved table; losing the race surfaces the service error instead,
       // and the same re-fetch in the next open shows who won.
       await refreshEventDetail(openedEvent.id);
-      // The caller's own history gained a row.
+      // The caller's own history gained a row, and the event's calendar
+      // line grays out now that placed_at is set.
       await refreshOrders();
       await refreshStats();
+      await refreshCalendar();
     });
   };
 
@@ -594,8 +680,10 @@ const App = () => {
         teamIds,
       });
       setCreateOutingOpen(false);
+      setOutingDefaultDate(null);
       setMessage({ appearance: "success", text: "Event Created." });
       await refreshOutings();
+      await refreshCalendar();
     });
 
   // --- Order lifecycle (CONTEXT.md §3.12) ---
@@ -795,6 +883,28 @@ const App = () => {
     setAddModalOpen(false);
   };
   const outingDefaultSlot = nextAvailableSlot();
+  // Calendar strip: the selected day's events, filtered client-side from the
+  // month already in hand (no second fetch), plus day-aware copy.
+  const todayDate = todayLocalDate();
+  const calDayEvents =
+    calEvents === null || calSelectedDate === null
+      ? null
+      : calEvents.filter(
+          (event) => localDateKey(event.scheduledAt) === calSelectedDate,
+        );
+  const calSelectedIsPast =
+    calSelectedDate !== null && calSelectedDate < todayDate;
+  const calStripTitle =
+    calSelectedDate === null || calSelectedDate === todayDate
+      ? "Today's Events"
+      : `Events for ${(() => {
+          const [y, m, d] = calSelectedDate.split("-").map(Number);
+          return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+            weekday: "long",
+            month: "long",
+            day: "numeric",
+          });
+        })()}`;
 
   return (
     <Stack grow="fill" space="space.150">
@@ -829,6 +939,7 @@ const App = () => {
             <Tab>Home</Tab>
             <Tab>Restaurants</Tab>
             <Tab>Teams</Tab>
+            <Tab>Calendar</Tab>
             <Tab>History</Tab>
           </TabList>
 
@@ -862,6 +973,7 @@ const App = () => {
                 </Stack>
 
                 <OutingsSection
+                  title="Today's Events"
                   events={outings}
                   teams={allTeams}
                   busy={busy}
@@ -870,56 +982,6 @@ const App = () => {
                   onClaimEvent={handleClaimEvent}
                 />
               </Stack>
-
-              <EventDetailModal
-                summary={openedEvent}
-                detail={eventDetail}
-                teams={allTeams}
-                inPool={
-                  openedEvent !== null &&
-                  (restaurants ?? []).some(
-                    (restaurant) => restaurant.id === openedEvent.restaurantId,
-                  )
-                }
-                busy={busy}
-                onClose={handleCloseEvent}
-                onSubmitOrder={handleSubmitEventOrder}
-                onSaveOrder={handleSaveEventOrder}
-                onCancelOrder={handleCancelEventOrder}
-                onPlaceOrders={handlePlaceEventOrders}
-                myAccountId={myAccountId}
-                onAbandon={handleAbandonEvent}
-                onClaim={() => {
-                  if (openedEvent) {
-                    handleClaimEvent(openedEvent);
-                  }
-                }}
-                onOpenEdit={() => setEditEventOpen(true)}
-              />
-
-              <EditEventModal
-                isOpen={editEventOpen}
-                event={eventDetail ?? openedEvent}
-                teams={myTeams}
-                busy={busy}
-                todayDate={todayLocalDate()}
-                onSave={handleUpdateEvent}
-                onCancel={() => setEditEventOpen(false)}
-              />
-
-              <CreateOutingModal
-                isOpen={createOutingOpen}
-                restaurants={restaurants}
-                teams={myTeams}
-                busy={busy}
-                todayDate={todayLocalDate()}
-                defaultDate={outingDefaultSlot.date}
-                earliestTimeToday={outingDefaultSlot.time}
-                wheelWinner={createEventWheelWinner}
-                onOpenWheel={handleOpenCreateWheel}
-                onCreate={handleCreateOuting}
-                onCancel={() => setCreateOutingOpen(false)}
-              />
             </Box>
           </Stack>
         </TabPanel>
@@ -986,6 +1048,45 @@ const App = () => {
         <TabPanel>
           <Stack alignInline="start" grow="fill">
             <Box xcss={tabPanelContentStyle}>
+              <Stack grow="fill" space="space.300">
+                {calSelectedDate !== null && (
+                  <OutingsSection
+                    title={calStripTitle}
+                    events={calDayEvents}
+                    teams={allTeams}
+                    busy={busy}
+                    createDisabled={calSelectedIsPast}
+                    reserveSpace
+                    emptyText={
+                      calSelectedIsPast
+                        ? "No events were held on this day."
+                        : "No events on this day yet — be a Lunch Boss!"
+                    }
+                    onStartOuting={() =>
+                      handleStartOutingForDate(calSelectedDate)
+                    }
+                    onOpenEvent={handleOpenEvent}
+                    onClaimEvent={handleClaimEvent}
+                  />
+                )}
+                <EventsCalendar
+                  year={calMonth.year}
+                  month={calMonth.month}
+                  events={calEvents}
+                  selectedDate={calSelectedDate}
+                  todayDate={todayDate}
+                  onSelectDay={setCalSelectedDate}
+                  onPrevMonth={handleCalPrevMonth}
+                  onNextMonth={handleCalNextMonth}
+                />
+              </Stack>
+            </Box>
+          </Stack>
+        </TabPanel>
+
+        <TabPanel>
+          <Stack alignInline="start" grow="fill">
+            <Box xcss={tabPanelContentStyle}>
               <Stack grow="fill" space="space.150">
                 <Heading as="h2">Order History</Heading>
                 <OrderHistory
@@ -1004,6 +1105,61 @@ const App = () => {
         </TabPanel>
         </Tabs>
       </Stack>
+
+      {/* Modals live OUTSIDE the Tabs: inactive TabPanels don't render, and
+          the event modals must open from Home and Calendar alike. */}
+      <EventDetailModal
+        summary={openedEvent}
+        detail={eventDetail}
+        teams={allTeams}
+        inPool={
+          openedEvent !== null &&
+          (restaurants ?? []).some(
+            (restaurant) => restaurant.id === openedEvent.restaurantId,
+          )
+        }
+        busy={busy}
+        onClose={handleCloseEvent}
+        onSubmitOrder={handleSubmitEventOrder}
+        onSaveOrder={handleSaveEventOrder}
+        onCancelOrder={handleCancelEventOrder}
+        onPlaceOrders={handlePlaceEventOrders}
+        myAccountId={myAccountId}
+        onAbandon={handleAbandonEvent}
+        onClaim={() => {
+          if (openedEvent) {
+            handleClaimEvent(openedEvent);
+          }
+        }}
+        onOpenEdit={() => setEditEventOpen(true)}
+      />
+
+      <EditEventModal
+        isOpen={editEventOpen}
+        event={eventDetail ?? openedEvent}
+        teams={myTeams}
+        busy={busy}
+        todayDate={todayDate}
+        onSave={handleUpdateEvent}
+        onCancel={() => setEditEventOpen(false)}
+      />
+
+      <CreateOutingModal
+        isOpen={createOutingOpen}
+        restaurants={restaurants}
+        teams={myTeams}
+        busy={busy}
+        todayDate={todayDate}
+        defaultDate={outingDefaultDate ?? outingDefaultSlot.date}
+        earliestTimeToday={outingDefaultSlot.time}
+        wheelWinner={createEventWheelWinner}
+        onOpenWheel={handleOpenCreateWheel}
+        onCreate={handleCreateOuting}
+        onCancel={() => {
+          setCreateOutingOpen(false);
+          setOutingDefaultDate(null);
+        }}
+      />
     </Stack>
   );
 };
