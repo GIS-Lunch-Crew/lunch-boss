@@ -14,11 +14,21 @@ import LoadingIcon from "./LoadingIcon";
 import type { EventSummary, Team } from "../../types";
 
 type Props = {
+  // Section heading — "Today's Events" on Home, "Events for …" on Calendar.
+  title: string;
   // null = still loading.
   events: EventSummary[] | null;
   // For mapping an outing's teamIds to names (the parent's allTeams).
   teams: Team[] | null;
   busy: boolean;
+  // True when creating isn't allowed here (a past day on the Calendar).
+  createDisabled?: boolean;
+  // Overrides the default empty-state copy (day-aware on the Calendar).
+  emptyText?: string;
+  // True to reserve the card row's footprint even with no events (a dashed
+  // outline), so surrounding layout (the Calendar grid) never jumps when a
+  // day's first card appears or its last one goes.
+  reserveSpace?: boolean;
   onStartOuting: () => void;
   // Clicking a card opens the Event-detail page.
   onOpenEvent: (event: EventSummary) => void;
@@ -31,6 +41,18 @@ type Props = {
 // Cards scroll horizontally; the Inline doesn't wrap, so it overflows and the
 // Box scrolls.
 const scrollRow = xcss({ overflow: "auto" });
+// Empty-state placeholder matching a min-height card's footprint (same
+// minHeight + border width as cardStyle) so the row's space is held open.
+const emptyStripStyle = xcss({
+  width: "100%",
+  minHeight: "160px",
+  borderColor: "color.border",
+  borderWidth: "border.width.selected",
+  borderStyle: "dashed",
+  borderRadius: "radius.small",
+  paddingBlockStart: "space.800",
+  paddingBlockEnd: "space.800",
+});
 // The card is a Box again (not one big Pressable) so the bossless card can
 // hold a real Claim button — nested press targets aren't allowed. The info
 // area stays clickable via an inner Pressable.
@@ -125,9 +147,13 @@ const formatInstant = (value: string): string => {
 };
 
 const OutingsSection = ({
+  title,
   events,
   teams,
   busy,
+  createDisabled = false,
+  emptyText = "No events today yet — be a Lunch Boss!",
+  reserveSpace = false,
   onStartOuting,
   onOpenEvent,
   onClaimEvent,
@@ -140,15 +166,25 @@ const OutingsSection = ({
       {/* The button hugs the heading — it must not drift outward with the
           width of the event strip. */}
       <Inline space="space.200" alignBlock="center" grow="fill">
-        <Heading as="h2">Today's Events</Heading>
-        <Button appearance="primary" isDisabled={busy} onClick={onStartOuting}>
+        <Heading as="h2">{title}</Heading>
+        <Button
+          appearance="primary"
+          isDisabled={busy || createDisabled}
+          onClick={onStartOuting}
+        >
           Be a Lunch Boss
         </Button>
       </Inline>
       {events === null ? (
         <LoadingIcon />
       ) : events.length === 0 ? (
-        <Text align="center">No events today yet — be a Lunch Boss!</Text>
+        reserveSpace ? (
+          <Box xcss={emptyStripStyle}>
+            <Text align="center">{emptyText}</Text>
+          </Box>
+        ) : (
+          <Text align="center">{emptyText}</Text>
+        )
       ) : (
         <Box xcss={scrollRow}>
           {/* alignBlock="stretch" equalizes card heights across the row —
