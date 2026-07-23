@@ -41,7 +41,7 @@ const TeamsPanel = ({
   return (
     <Stack grow="fill" space="space.300">
       <Stack grow="fill" space="space.150">
-        <Heading as="h2">My teams</Heading>
+        <Heading as="h2">My Teams</Heading>
         {myTeams === null ? (
           <Spinner label="Loading your teams" />
         ) : myTeams.length === 0 ? (
@@ -49,11 +49,7 @@ const TeamsPanel = ({
         ) : (
           <Stack space="space.100">
             {myTeams.map((team) => (
-              <Inline
-                key={team.id}
-                spread="space-between"
-                alignBlock="center"
-              >
+              <Inline key={team.id} spread="space-between" alignBlock="center">
                 <Text>{team.name}</Text>
                 <Button
                   appearance="subtle"
@@ -69,7 +65,7 @@ const TeamsPanel = ({
       </Stack>
 
       <Stack grow="fill" space="space.150">
-        <Heading as="h2">Join or create a team</Heading>
+        <Heading as="h2">Join or Create a Team</Heading>
         {joinable.length > 0 && (
           <Stack space="space.050">
             <Label labelFor="joinTeam">Join an existing team</Label>
