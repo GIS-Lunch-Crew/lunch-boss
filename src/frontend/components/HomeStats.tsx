@@ -1,5 +1,6 @@
 import React from "react";
-import { Spinner, Stack, Text } from "@forge/react";
+import { Stack, Text } from "@forge/react";
+import LoadingIcon from "./LoadingIcon";
 import type { OrderStats } from "../../types";
 
 type Props = {
@@ -11,7 +12,7 @@ type Props = {
 // getOrderStats resolver so this never has to touch full order history.
 const HomeStats = ({ stats }: Props) => {
   if (stats === null) {
-    return <Spinner label="Loading stats" />;
+    return <LoadingIcon />;
   }
 
   return (

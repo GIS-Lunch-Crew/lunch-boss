@@ -15,7 +15,6 @@ import {
   ModalTitle,
   ModalTransition,
   Pressable,
-  Spinner,
   Stack,
   Strong,
   Text,
@@ -23,6 +22,7 @@ import {
   xcss,
 } from "@forge/react";
 import EventOrderForm from "./EventOrderForm";
+import LoadingIcon from "./LoadingIcon";
 import type { EventDetail, EventSummary, Team } from "../../types";
 import { SECTION_MIN_WIDTH } from "../layout";
 
@@ -203,7 +203,7 @@ const EventDetailModal = ({
             )}
 
             {detail === null ? (
-              <Spinner label="Loading event" />
+              <LoadingIcon />
             ) : (
               <EventOrderForm
                 // Field state is local, read on mount — remount whenever the
@@ -279,7 +279,7 @@ const EventDetailModal = ({
                 </Button>
               </Inline>
               {detail === null ? (
-                <Spinner label="Loading orders" />
+                <LoadingIcon />
               ) : (
                 <Box xcss={tableWrapStyle}>
                   <DynamicTable

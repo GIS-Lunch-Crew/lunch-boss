@@ -8,13 +8,13 @@ import {
   Inline,
   Link,
   Popup,
-  Spinner,
   Stack,
   Text,
   Textfield,
   Tooltip,
   xcss,
 } from "@forge/react";
+import LoadingIcon from "./LoadingIcon";
 import type { Restaurant } from "../../types";
 import { SECTION_MIN_WIDTH } from "../layout";
 
@@ -214,7 +214,7 @@ const RestaurantTable = ({
   return (
     <Stack grow="fill" space="space.100">
       {restaurants === null ? (
-        <Spinner label="Loading your restaurants" />
+        <LoadingIcon />
       ) : restaurants.length === 0 ? (
         <Text>No restaurants exist yet. Add one above.</Text>
       ) : (
