@@ -47,6 +47,7 @@ const cardStyle = (event: EventSummary) =>
     borderStyle: "solid",
     borderRadius: "radius.small",
     backgroundColor: "elevation.surface",
+    opacity: event.placedAt !== null ? "opacity.disabled" : undefined,
   });
 // Bossed card: ONE press area covering the whole card. `height: 100%` makes
 // it fill the stretched card box, so a shorter card is clickable to its
