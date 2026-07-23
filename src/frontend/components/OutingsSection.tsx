@@ -38,7 +38,7 @@ const scrollRow = xcss({ overflow: "auto" });
 // so the click range reaches the drawn border with no dead rim.
 const cardStyle = (event: EventSummary) =>
   xcss({
-    minWidth: "280px",
+    minWidth: "360px",
     minHeight: "160px",
     borderColor: event.hasMyOrder
       ? "color.border.success"
@@ -94,6 +94,23 @@ const fillBoxStyle = xcss({ height: "100%", width: "100%" });
 const claimNudgeStyle = xcss({ paddingBlockStart: "space.150" });
 // One cell of the 2-wide team grid.
 const teamCellStyle = xcss({ width: "50%" });
+// A team name's pill — faded teal, fully rounded, bordered. Uses the
+// design system's own pre-faded fill token rather than the `opacity`
+// property: opacity applies to the whole subtree, so it was fading the
+// team name text along with the fill/border, with no way to exclude a
+// child from its parent's opacity.
+const teamPillStyle = xcss({
+  width: "100%",
+  textAlign: "center",
+  backgroundColor: "color.background.accent.teal.subtler",
+  borderColor: "color.border.accent.teal",
+  borderWidth: "border.width",
+  borderStyle: "solid",
+  borderRadius: "radius.full",
+  paddingInline: "space.100",
+  paddingBlockStart: "space.025",
+  paddingBlockEnd: "space.025",
+});
 
 // Stored UTC instant ("YYYY-MM-DD HH:MM:SS") → the viewer's local time, to the
 // minute (no seconds).
@@ -166,7 +183,9 @@ const OutingsSection = ({
                       <Inline key={row[0]} space="space.0" grow="fill">
                         {row.map((id) => (
                           <Box key={id} xcss={teamCellStyle}>
-                            <Text>{teamName(id)}</Text>
+                            <Box xcss={teamPillStyle}>
+                              <Text>{teamName(id)}</Text>
+                            </Box>
                           </Box>
                         ))}
                       </Inline>
