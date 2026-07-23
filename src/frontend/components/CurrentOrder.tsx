@@ -4,13 +4,13 @@ import {
   ErrorMessage,
   Inline,
   Label,
-  Spinner,
   Stack,
   Strong,
   Text,
   TextArea,
   Textfield,
 } from "@forge/react";
+import LoadingIcon from "./LoadingIcon";
 import WheelModal from "./WheelModal";
 import type { CurrentSubmission } from "../../types";
 
@@ -99,7 +99,7 @@ const CurrentOrder = ({
 
   // --- Stage: loading ---
   if (submission === undefined) {
-    return <Spinner label="Loading your order" />;
+    return <LoadingIcon />;
   }
 
   // The wheel is a Modal overlay now (WheelModal), so it can be rendered as

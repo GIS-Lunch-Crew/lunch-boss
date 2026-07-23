@@ -5,10 +5,10 @@ import {
   DynamicTable,
   Inline,
   Label,
-  Spinner,
   Stack,
   Text,
 } from "@forge/react";
+import LoadingIcon from "./LoadingIcon";
 import type { PlacedOrder } from "../../types";
 
 type Props = {
@@ -136,7 +136,7 @@ const OrderHistory = ({
         )}
       </Inline>
       {orders === null ? (
-        <Spinner label="Loading your orders" />
+        <LoadingIcon />
       ) : orders.length === 0 ? (
         <Text>
           {filtered

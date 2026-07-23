@@ -5,11 +5,11 @@ import {
   Inline,
   Label,
   Select,
-  Spinner,
   Stack,
   Text,
   Textfield,
 } from "@forge/react";
+import LoadingIcon from "./LoadingIcon";
 import type { Team } from "../../types";
 
 type Props = {
@@ -43,7 +43,7 @@ const TeamsPanel = ({
       <Stack grow="fill" space="space.150">
         <Heading as="h2">My Teams</Heading>
         {myTeams === null ? (
-          <Spinner label="Loading your teams" />
+          <LoadingIcon />
         ) : myTeams.length === 0 ? (
           <Text>You're not in any teams yet.</Text>
         ) : (

@@ -5,12 +5,12 @@ import {
   Heading,
   Inline,
   Pressable,
-  Spinner,
   Stack,
   Text,
   User,
   xcss,
 } from "@forge/react";
+import LoadingIcon from "./LoadingIcon";
 import type { EventSummary, Team } from "../../types";
 
 type Props = {
@@ -125,7 +125,7 @@ const OutingsSection = ({
         </Button>
       </Inline>
       {events === null ? (
-        <Spinner label="Loading events" />
+        <LoadingIcon />
       ) : events.length === 0 ? (
         <Text>No events today yet — be a Lunch Boss!</Text>
       ) : (
