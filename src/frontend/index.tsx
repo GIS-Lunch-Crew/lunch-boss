@@ -27,6 +27,7 @@ import OutingsSection from "./components/OutingsSection";
 import CreateOutingModal from "./components/CreateOutingModal";
 import EventDetailModal from "./components/EventDetailModal";
 import EditEventModal from "./components/EditEventModal";
+import { SECTION_MIN_WIDTH } from "./layout";
 import type {
   AbandonEventResult,
   AddRestaurantResult,
@@ -47,7 +48,24 @@ type Message = {
   text: string;
 };
 
-const tabPanelTopSpacing = xcss({ paddingTop: "space.200" });
+// Tab content is capped well short of the full viewport and centered (via
+// the wrapping Stack's alignInline="center") rather than stretching
+// edge-to-edge. minWidth keeps the table-bearing tabs from ever going
+// narrower than the tables themselves need.
+const tabPanelContentStyle = xcss({
+  paddingTop: "space.200",
+  width: "88%",
+  minWidth: SECTION_MIN_WIDTH,
+});
+// Teams has no table and far less content — half the standard tab width.
+const teamsPanelContentStyle = xcss({
+  paddingTop: "space.200",
+  width: "44%",
+  minWidth: "380px",
+});
+// Section headings default to left-aligned text; this centers them within
+// their (already full-width, via the ambient Stack's default stretch) box.
+const centeredHeadingStyle = xcss({ textAlign: "center" });
 
 // User-facing text for each addRestaurant outcome (CONTEXT.md §3.10).
 const OUTCOME_MESSAGES: Record<AddRestaurantResult["outcome"], Message> = {
@@ -806,167 +824,179 @@ const App = () => {
         </TabList>
 
         <TabPanel>
-          <Box xcss={tabPanelTopSpacing}>
-            <Stack grow="fill" space="space.300">
-              <Stack grow="fill" space="space.150">
-                <Heading as="h2">Current Order</Heading>
-                <CurrentOrder
-                  key={orderKey}
-                  submission={submission}
-                  selected={selected}
-                  prefill={prefill}
+          <Stack alignInline="center" grow="fill">
+            <Box xcss={tabPanelContentStyle}>
+              <Stack grow="fill" space="space.300">
+                <Stack grow="fill" space="space.150">
+                  <Box xcss={centeredHeadingStyle}>
+                    <Heading as="h2">Current Order</Heading>
+                  </Box>
+                  <CurrentOrder
+                    key={orderKey}
+                    submission={submission}
+                    selected={selected}
+                    prefill={prefill}
+                    busy={busy}
+                    poolEmpty={(restaurants ?? []).length === 0}
+                    wheelOpen={wheelOpen}
+                    onCancelWheel={() => setWheelOpen(false)}
+                    onPickRandom={pickRandom}
+                    onCancelSelection={cancelSelection}
+                    onSubmitOrder={handleSubmitOrder}
+                    onSaveSubmission={handleSaveSubmission}
+                    onClearSubmission={handleClearSubmission}
+                    onPlaceOrder={handlePlaceOrder}
+                  />
+                </Stack>
+
+                <OutingsSection
+                  events={outings}
+                  teams={allTeams}
                   busy={busy}
-                  poolEmpty={(restaurants ?? []).length === 0}
-                  wheelOpen={wheelOpen}
-                  onCancelWheel={() => setWheelOpen(false)}
-                  onPickRandom={pickRandom}
-                  onCancelSelection={cancelSelection}
-                  onSubmitOrder={handleSubmitOrder}
-                  onSaveSubmission={handleSaveSubmission}
-                  onClearSubmission={handleClearSubmission}
-                  onPlaceOrder={handlePlaceOrder}
+                  onStartOuting={handleStartOuting}
+                  onOpenEvent={handleOpenEvent}
+                  onClaimEvent={handleClaimEvent}
                 />
+
+                <Stack grow="fill" space="space.150">
+                  <Box xcss={centeredHeadingStyle}>
+                    <Heading as="h2">Stats</Heading>
+                  </Box>
+                  <HomeStats stats={stats} />
+                </Stack>
               </Stack>
 
-              <OutingsSection
-                events={outings}
+              <EventDetailModal
+                summary={openedEvent}
+                detail={eventDetail}
                 teams={allTeams}
-                busy={busy}
-                onStartOuting={handleStartOuting}
-                onOpenEvent={handleOpenEvent}
-                onClaimEvent={handleClaimEvent}
-              />
-
-              <Stack grow="fill" space="space.150">
-                <Heading as="h2">Stats</Heading>
-                <HomeStats stats={stats} />
-              </Stack>
-            </Stack>
-
-            <EventDetailModal
-              summary={openedEvent}
-              detail={eventDetail}
-              teams={allTeams}
-              inPool={
-                openedEvent !== null &&
-                (restaurants ?? []).some(
-                  (restaurant) => restaurant.id === openedEvent.restaurantId,
-                )
-              }
-              busy={busy}
-              onClose={handleCloseEvent}
-              onSubmitOrder={handleSubmitEventOrder}
-              onSaveOrder={handleSaveEventOrder}
-              onCancelOrder={handleCancelEventOrder}
-              onPlaceOrders={handlePlaceEventOrders}
-              myAccountId={myAccountId}
-              onAbandon={handleAbandonEvent}
-              onClaim={() => {
-                if (openedEvent) {
-                  handleClaimEvent(openedEvent);
+                inPool={
+                  openedEvent !== null &&
+                  (restaurants ?? []).some(
+                    (restaurant) => restaurant.id === openedEvent.restaurantId,
+                  )
                 }
-              }}
-              onOpenEdit={() => setEditEventOpen(true)}
-            />
-
-            <EditEventModal
-              isOpen={editEventOpen}
-              event={eventDetail ?? openedEvent}
-              teams={myTeams}
-              busy={busy}
-              todayDate={todayLocalDate()}
-              onSave={handleUpdateEvent}
-              onCancel={() => setEditEventOpen(false)}
-            />
-
-            <CreateOutingModal
-              isOpen={createOutingOpen}
-              restaurants={restaurants}
-              teams={myTeams}
-              busy={busy}
-              todayDate={todayLocalDate()}
-              defaultDate={outingDefaultSlot.date}
-              earliestTimeToday={outingDefaultSlot.time}
-              wheelWinner={createEventWheelWinner}
-              onOpenWheel={handleOpenCreateWheel}
-              onCreate={handleCreateOuting}
-              onCancel={() => setCreateOutingOpen(false)}
-            />
-          </Box>
-        </TabPanel>
-
-        <TabPanel>
-          <Box xcss={tabPanelTopSpacing}>
-            <Stack grow="fill" space="space.300">
-              <Stack grow="fill" space="space.150">
-                <Heading as="h2">My Restaurant Pool</Heading>
-                <RestaurantTable
-                  restaurants={restaurants}
-                  busy={busy}
-                  selectionDisabled={submission != null}
-                  selectedRestaurantId={
-                    selected?.id ?? submission?.restaurantId ?? null
+                busy={busy}
+                onClose={handleCloseEvent}
+                onSubmitOrder={handleSubmitEventOrder}
+                onSaveOrder={handleSaveEventOrder}
+                onCancelOrder={handleCancelEventOrder}
+                onPlaceOrders={handlePlaceEventOrders}
+                myAccountId={myAccountId}
+                onAbandon={handleAbandonEvent}
+                onClaim={() => {
+                  if (openedEvent) {
+                    handleClaimEvent(openedEvent);
                   }
-                  onSelect={startSelection}
-                  onEdit={(restaurant) => {
-                    setMessage(null);
-                    setEditing(restaurant);
-                  }}
-                  onRemove={handleRemove}
+                }}
+                onOpenEdit={() => setEditEventOpen(true)}
+              />
+
+              <EditEventModal
+                isOpen={editEventOpen}
+                event={eventDetail ?? openedEvent}
+                teams={myTeams}
+                busy={busy}
+                todayDate={todayLocalDate()}
+                onSave={handleUpdateEvent}
+                onCancel={() => setEditEventOpen(false)}
+              />
+
+              <CreateOutingModal
+                isOpen={createOutingOpen}
+                restaurants={restaurants}
+                teams={myTeams}
+                busy={busy}
+                todayDate={todayLocalDate()}
+                defaultDate={outingDefaultSlot.date}
+                earliestTimeToday={outingDefaultSlot.time}
+                wheelWinner={createEventWheelWinner}
+                onOpenWheel={handleOpenCreateWheel}
+                onCreate={handleCreateOuting}
+                onCancel={() => setCreateOutingOpen(false)}
+              />
+            </Box>
+          </Stack>
+        </TabPanel>
+
+        <TabPanel>
+          <Stack alignInline="center" grow="fill">
+            <Box xcss={tabPanelContentStyle}>
+              <Stack grow="fill" space="space.300">
+                <Stack grow="fill" space="space.150">
+                  <Heading as="h2">My Restaurant Pool</Heading>
+                  <RestaurantTable
+                    restaurants={restaurants}
+                    busy={busy}
+                    selectionDisabled={submission != null}
+                    selectedRestaurantId={
+                      selected?.id ?? submission?.restaurantId ?? null
+                    }
+                    onSelect={startSelection}
+                    onEdit={(restaurant) => {
+                      setMessage(null);
+                      setEditing(restaurant);
+                    }}
+                    onRemove={handleRemove}
+                  />
+                  <Inline>
+                    <Button
+                      appearance="primary"
+                      isDisabled={busy}
+                      onClick={() => setAddModalOpen(true)}
+                    >
+                      Add restaurant
+                    </Button>
+                  </Inline>
+                </Stack>
+
+                <RestaurantFormModal
+                  key={restaurantFormKey}
+                  isOpen={restaurantModalOpen}
+                  editing={editing}
+                  busy={busy}
+                  onSubmit={handleRestaurantSubmit}
+                  onCancel={closeRestaurantModal}
+                  onDelete={handleDelete}
                 />
-                <Inline>
-                  <Button
-                    appearance="primary"
-                    isDisabled={busy}
-                    onClick={() => setAddModalOpen(true)}
-                  >
-                    Add restaurant
-                  </Button>
-                </Inline>
               </Stack>
-
-              <RestaurantFormModal
-                key={restaurantFormKey}
-                isOpen={restaurantModalOpen}
-                editing={editing}
-                busy={busy}
-                onSubmit={handleRestaurantSubmit}
-                onCancel={closeRestaurantModal}
-                onDelete={handleDelete}
-              />
-            </Stack>
-          </Box>
+            </Box>
+          </Stack>
         </TabPanel>
 
         <TabPanel>
-          <Box xcss={tabPanelTopSpacing}>
-            <TeamsPanel
-              myTeams={myTeams}
-              allTeams={allTeams}
-              busy={busy}
-              onCreateOrJoinByName={handleCreateOrJoinByName}
-              onJoin={handleJoinTeam}
-              onLeave={handleLeaveTeam}
-            />
-          </Box>
+          <Stack alignInline="center" grow="fill">
+            <Box xcss={teamsPanelContentStyle}>
+              <TeamsPanel
+                myTeams={myTeams}
+                allTeams={allTeams}
+                busy={busy}
+                onCreateOrJoinByName={handleCreateOrJoinByName}
+                onJoin={handleJoinTeam}
+                onLeave={handleLeaveTeam}
+              />
+            </Box>
+          </Stack>
         </TabPanel>
 
         <TabPanel>
-          <Box xcss={tabPanelTopSpacing}>
-            <Stack grow="fill" space="space.150">
-              <Heading as="h2">Order History</Heading>
-              <OrderHistory
-                key={`history-${orderFilter.from ?? ""}-${orderFilter.to ?? ""}`}
-                orders={orders}
-                from={orderFilter.from}
-                to={orderFilter.to}
-                busy={busy}
-                reorderDisabled={submission != null}
-                onFilterChange={(from, to) => setOrderFilter({ from, to })}
-                onReorder={handleReorder}
-              />
-            </Stack>
-          </Box>
+          <Stack alignInline="center" grow="fill">
+            <Box xcss={tabPanelContentStyle}>
+              <Stack grow="fill" space="space.150">
+                <Heading as="h2">Order History</Heading>
+                <OrderHistory
+                  key={`history-${orderFilter.from ?? ""}-${orderFilter.to ?? ""}`}
+                  orders={orders}
+                  from={orderFilter.from}
+                  to={orderFilter.to}
+                  busy={busy}
+                  reorderDisabled={submission != null}
+                  onFilterChange={(from, to) => setOrderFilter({ from, to })}
+                  onReorder={handleReorder}
+                />
+              </Stack>
+            </Box>
+          </Stack>
         </TabPanel>
       </Tabs>
     </Stack>

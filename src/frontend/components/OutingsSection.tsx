@@ -118,7 +118,12 @@ const OutingsSection = ({
     <Stack grow="fill" space="space.150">
       {/* The button hugs the heading — it must not drift outward with the
           width of the event strip. */}
-      <Inline space="space.200" alignBlock="center">
+      <Inline
+        space="space.200"
+        alignBlock="center"
+        grow="fill"
+        alignInline="center"
+      >
         <Heading as="h2">Today's Events</Heading>
         <Button appearance="primary" isDisabled={busy} onClick={onStartOuting}>
           Be a Lunch Boss
@@ -127,12 +132,21 @@ const OutingsSection = ({
       {events === null ? (
         <Spinner label="Loading events" />
       ) : events.length === 0 ? (
-        <Text>No events today yet — be a Lunch Boss!</Text>
+        <Text align="center">No events today yet — be a Lunch Boss!</Text>
       ) : (
         <Box xcss={scrollRow}>
           {/* alignBlock="stretch" equalizes card heights across the row —
-              the tallest (most teams) sets the height for all. */}
-          <Inline space="space.150" alignBlock="stretch">
+              the tallest (most teams) sets the height for all. grow="fill"
+              + alignInline="center" centers the row when it fits; once it
+              overflows, centering clips both edges equally rather than
+              anchoring the first card at the left, but that's an acceptable
+              trade for the common (non-overflowing) case. */}
+          <Inline
+            space="space.150"
+            alignBlock="stretch"
+            grow="fill"
+            alignInline="center"
+          >
             {events.map((event) => {
               // 2-wide team grid rows; the card grows downward row by row and
               // the stretch above keeps sibling cards the same height. No gap

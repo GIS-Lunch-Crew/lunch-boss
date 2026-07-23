@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
+  Box,
   Button,
   Checkbox,
   DynamicTable,
@@ -19,9 +20,15 @@ import {
   Strong,
   Text,
   User,
+  xcss,
 } from "@forge/react";
 import EventOrderForm from "./EventOrderForm";
 import type { EventDetail, EventSummary, Team } from "../../types";
+import { SECTION_MIN_WIDTH } from "../layout";
+
+// Floor width shared with the other tables — isFixedSize + per-column width
+// keeps it stable instead of resizing as rows load.
+const tableWrapStyle = xcss({ minWidth: SECTION_MIN_WIDTH });
 
 type Props = {
   // The card the user clicked (null = closed). Seeds the instant paint —
@@ -274,18 +281,31 @@ const EventDetailModal = ({
               {detail === null ? (
                 <Spinner label="Loading orders" />
               ) : (
-                <DynamicTable
-                  head={{
-                    cells: [
-                      { key: "person", content: "Person" },
-                      { key: "items", content: "Order" },
-                      { key: "total", content: "Total" },
-                      { key: "notes", content: "Notes" },
-                    ],
-                  }}
-                  rows={orderRows}
-                  emptyView={<Text>No orders on this event yet.</Text>}
-                />
+                <Box xcss={tableWrapStyle}>
+                  <DynamicTable
+                    head={{
+                      cells: [
+                        { key: "person", content: "Person", width: 20 },
+                        {
+                          key: "items",
+                          content: "Order",
+                          width: 30,
+                          shouldTruncate: true,
+                        },
+                        { key: "total", content: "Total", width: 15 },
+                        {
+                          key: "notes",
+                          content: "Notes",
+                          width: 35,
+                          shouldTruncate: true,
+                        },
+                      ],
+                    }}
+                    rows={orderRows}
+                    isFixedSize
+                    emptyView={<Text>No orders on this event yet.</Text>}
+                  />
+                </Box>
               )}
             </Stack>
           </Stack>

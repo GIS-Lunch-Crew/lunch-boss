@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  Box,
   Button,
   DatePicker,
   DynamicTable,
@@ -8,8 +9,14 @@ import {
   Spinner,
   Stack,
   Text,
+  xcss,
 } from "@forge/react";
 import type { PlacedOrder } from "../../types";
+import { SECTION_MIN_WIDTH } from "../layout";
+
+// Floor width shared with the other tables — isFixedSize + per-column width
+// keeps it stable instead of resizing as rows load.
+const tableWrapStyle = xcss({ minWidth: SECTION_MIN_WIDTH });
 
 type Props = {
   orders: PlacedOrder[] | null;
@@ -25,12 +32,12 @@ type Props = {
 
 const head = {
   cells: [
-    { key: "date", content: "Date" },
-    { key: "restaurant", content: "Restaurant" },
-    { key: "items", content: "Order" },
-    { key: "total", content: "Total" },
-    { key: "notes", content: "Notes" },
-    { key: "actions", content: "" },
+    { key: "date", content: "Date", width: 15 },
+    { key: "restaurant", content: "Restaurant", width: 20, shouldTruncate: true },
+    { key: "items", content: "Order", width: 20, shouldTruncate: true },
+    { key: "total", content: "Total", width: 10 },
+    { key: "notes", content: "Notes", width: 20, shouldTruncate: true },
+    { key: "actions", content: "", width: 15 },
   ],
 };
 
@@ -144,7 +151,9 @@ const OrderHistory = ({
             : "No orders yet. Your placed orders will show up here."}
         </Text>
       ) : (
-        <DynamicTable head={head} rows={rows} />
+        <Box xcss={tableWrapStyle}>
+          <DynamicTable head={head} rows={rows} isFixedSize />
+        </Box>
       )}
     </Stack>
   );
