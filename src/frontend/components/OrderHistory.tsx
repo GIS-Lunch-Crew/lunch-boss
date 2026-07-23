@@ -88,7 +88,7 @@ const OrderHistory = ({
             isDisabled={busy || reorderDisabled}
             onClick={() => onReorder(order)}
           >
-            Re-order
+            Re-Order
           </Button>
         ),
       },
