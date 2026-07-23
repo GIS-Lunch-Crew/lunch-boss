@@ -3,6 +3,7 @@ import ForgeReconciler, {
   Box,
   Button,
   Heading,
+  Image,
   Inline,
   SectionMessage,
   Stack,
@@ -11,10 +12,13 @@ import ForgeReconciler, {
   TabPanel,
   Tabs,
   Text,
+  useTheme,
   xcss,
 } from "@forge/react";
 import { events, invoke, requestConfluence, view } from "@forge/bridge";
 import { describeError, unwrap } from "./lib/invoke";
+import lunchBossLogo from "./assets/LunchBossLogoText_Orange.png";
+import lunchBossLogoDark from "./assets/LunchBossLogoWhiteText_Orange.png";
 import CurrentOrder from "./components/CurrentOrder";
 import type { OrderPrefill, SelectionTarget } from "./components/CurrentOrder";
 import HomeStats from "./components/HomeStats";
@@ -65,6 +69,14 @@ const teamsPanelContentStyle = xcss({
   minWidth: "380px",
 });
 const messageSlot = xcss({ height: "2.25rem" });
+// Current Order/Stats sit side by side in an Inline that wraps once the row
+// can no longer fit both min-widths (no CSS media queries in UI Kit).
+const currentOrderColumnStyle = xcss({ flexGrow: 1, minWidth: "420px" });
+const statsColumnStyle = xcss({
+  flexGrow: 1,
+  minWidth: "280px",
+  maxWidth: "360px",
+});
 
 // User-facing text for each addRestaurant outcome (CONTEXT.md §3.10).
 const OUTCOME_MESSAGES: Record<AddRestaurantResult["outcome"], Message> = {
@@ -156,6 +168,9 @@ const localDateTimeToUtc = (date: string, time: string): string => {
 };
 
 const App = () => {
+  const theme = useTheme();
+  const logoSrc =
+    theme?.colorMode === "dark" ? lunchBossLogoDark : lunchBossLogo;
   // null = pool still loading; undefined = submission still loading.
   const [restaurants, setRestaurants] = useState<Restaurant[] | null>(null);
   const [submission, setSubmission] = useState<
@@ -917,9 +932,11 @@ const App = () => {
 
   return (
     <Stack grow="fill" space="space.150">
-      <Stack space="space.050">
+      <Stack space="space.0" alignInline="start">
         <Inline grow="fill" spread="space-between" alignBlock="center">
-          <Heading as="h1">Lunch Boss</Heading>
+          <Inline>
+            <Image src={logoSrc} alt="Lunch Boss" height={70} />
+          </Inline>
           {environmentType !== null && environmentType !== "PRODUCTION" && (
             <Button isDisabled={busy} onClick={handleRunMigrations}>
               Run migrations (dev)
@@ -956,30 +973,41 @@ const App = () => {
             <Stack alignInline="start" grow="fill">
               <Box xcss={tabPanelContentStyle}>
                 <Stack grow="fill" space="space.300">
-                  <Stack grow="fill" space="space.150">
-                    <Heading as="h2">Current Order</Heading>
-                    <CurrentOrder
-                      key={orderKey}
-                      submission={submission}
-                      selected={selected}
-                      prefill={prefill}
-                      busy={busy}
-                      poolEmpty={(restaurants ?? []).length === 0}
-                      wheelOpen={wheelOpen}
-                      onCancelWheel={() => setWheelOpen(false)}
-                      onPickRandom={pickRandom}
-                      onCancelSelection={cancelSelection}
-                      onSubmitOrder={handleSubmitOrder}
-                      onSaveSubmission={handleSaveSubmission}
-                      onClearSubmission={handleClearSubmission}
-                      onPlaceOrder={handlePlaceOrder}
-                    />
-                  </Stack>
+                  <Inline
+                    shouldWrap
+                    space="space.300"
+                    alignBlock="start"
+                    grow="fill"
+                  >
+                    <Box xcss={currentOrderColumnStyle}>
+                      <Stack grow="fill" space="space.150">
+                        <Heading as="h2">Current Order</Heading>
+                        <CurrentOrder
+                          key={orderKey}
+                          submission={submission}
+                          selected={selected}
+                          prefill={prefill}
+                          busy={busy}
+                          poolEmpty={(restaurants ?? []).length === 0}
+                          wheelOpen={wheelOpen}
+                          onCancelWheel={() => setWheelOpen(false)}
+                          onPickRandom={pickRandom}
+                          onCancelSelection={cancelSelection}
+                          onSubmitOrder={handleSubmitOrder}
+                          onSaveSubmission={handleSaveSubmission}
+                          onClearSubmission={handleClearSubmission}
+                          onPlaceOrder={handlePlaceOrder}
+                        />
+                      </Stack>
+                    </Box>
 
-                  <Stack grow="fill" space="space.150">
-                    <Heading as="h2">Stats</Heading>
-                    <HomeStats stats={stats} />
-                  </Stack>
+                    <Box xcss={statsColumnStyle}>
+                      <Stack space="space.150">
+                        <Heading as="h2">Stats</Heading>
+                        <HomeStats stats={stats} />
+                      </Stack>
+                    </Box>
+                  </Inline>
 
                   <OutingsSection
                     title="Today's Events"
