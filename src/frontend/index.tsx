@@ -875,7 +875,6 @@ const App = () => {
           <Box xcss={tabPanelTopSpacing}>
             <Stack grow="fill" space="space.300">
               <Stack grow="fill" space="space.150">
-                <Heading as="h2">My Restaurant Pool</Heading>
                 <RestaurantTable
                   restaurants={restaurants}
                   busy={busy}
