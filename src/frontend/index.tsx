@@ -79,19 +79,18 @@ const statsColumnStyle = xcss({
 });
 
 // User-facing text for each addRestaurant outcome (CONTEXT.md §3.10).
-const OUTCOME_MESSAGES: Record<AddRestaurantResult["outcome"], Message> = {
-  created: {
-    appearance: "success",
-    text: "Restaurant created and added to your pool.",
-  },
-  "linked-existing": {
-    appearance: "information",
-    text: "Restaurant added to your pool.",
-  },
-  resurrected: {
-    appearance: "information",
-    text: "Restaurant added to your pool.",
-  },
+const outcomeMessage = (result: AddRestaurantResult): Message => {
+  const name = result.restaurant.name;
+  switch (result.outcome) {
+    case "created":
+      return {
+        appearance: "success",
+        text: `${name} created and added to your pool.`,
+      };
+    case "linked-existing":
+    case "resurrected":
+      return { appearance: "information", text: `${name} added to your pool.` };
+  }
 };
 
 // Mirrors validation/orderSchemas.ts MAX_TOTAL.
@@ -204,6 +203,11 @@ const App = () => {
   // `orders`) so a History-tab date filter never silently skews the counts.
   const [stats, setStats] = useState<OrderStats | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
+  useEffect(() => {
+    if (!message) return;
+    const timer = setTimeout(() => setMessage(null), 6000);
+    return () => clearTimeout(timer);
+  }, [message]);
   const [busy, setBusy] = useState(false);
   const [environmentType, setEnvironmentType] = useState<string | null>(null);
   // Session-only greeting; fetched per page load, never persisted (§3.2).
@@ -401,13 +405,16 @@ const App = () => {
           restaurantId: editing.id,
           ...fields,
         });
-        setMessage({ appearance: "success", text: "Restaurant updated." });
+        setMessage({
+          appearance: "success",
+          text: `${editing.name} updated.`,
+        });
         setEditing(null);
       } else {
         const result = unwrap(
           await invoke<AddRestaurantResult>("addRestaurant", fields),
         );
-        setMessage(OUTCOME_MESSAGES[result.outcome]);
+        setMessage(outcomeMessage(result));
         setFormVersion((version) => version + 1);
       }
       await refresh();
@@ -435,22 +442,33 @@ const App = () => {
       );
       setMessage({
         appearance: "success",
-        text: result.outcome === "created" ? "Team created." : "Joined team.",
+        text:
+          result.outcome === "created"
+            ? `Created team ${result.team.name}.`
+            : `Joined team ${result.team.name}.`,
       });
       await refreshTeams();
     });
 
   const handleJoinTeam = (teamId: number) =>
     runAction(async () => {
+      const name = allTeams?.find((team) => team.id === teamId)?.name;
       await invoke("joinTeam", { teamId });
-      setMessage({ appearance: "success", text: "Joined team." });
+      setMessage({
+        appearance: "success",
+        text: name ? `Joined team ${name}.` : "Joined team.",
+      });
       await refreshTeams();
     });
 
   const handleLeaveTeam = (teamId: number) =>
     runAction(async () => {
+      const name = myTeams?.find((team) => team.id === teamId)?.name;
       await invoke("leaveTeam", { teamId });
-      setMessage({ appearance: "information", text: "Left team." });
+      setMessage({
+        appearance: "information",
+        text: name ? `Left team ${name}.` : "Left team.",
+      });
       await refreshTeams();
     });
 
@@ -611,7 +629,7 @@ const App = () => {
       await invoke("claimEvent", { eventId: event.id });
       setMessage({
         appearance: "success",
-        text: "You are now the Lunch Boss.",
+        text: `You are now the Lunch Boss for ${event.restaurantName}.`,
       });
       await refreshOutings();
       await refreshCalendar();
@@ -631,14 +649,15 @@ const App = () => {
       );
       // Close the page on both outcomes — an ex-boss lingering on a stale
       // view could otherwise press Abandon again.
+      const name = openedEvent.restaurantName;
       setOpenedEvent(null);
       setEventDetail(null);
       setMessage({
         appearance: "information",
         text:
           result.outcome === "deleted"
-            ? "Event deleted."
-            : "Bossdom abandoned.",
+            ? `${name} event deleted.`
+            : `Bossdom abandoned for ${name}.`,
       });
       await refreshOutings();
       await refreshCalendar();
@@ -660,7 +679,10 @@ const App = () => {
         teamIds,
       });
       setEditEventOpen(false);
-      setMessage({ appearance: "success", text: "Event updated." });
+      setMessage({
+        appearance: "success",
+        text: `${current.restaurantName} event updated.`,
+      });
       await refreshEventDetail(openedEvent.id);
       await refreshOutings();
       await refreshCalendar();
@@ -673,7 +695,10 @@ const App = () => {
     }
     return runAction(async () => {
       await invoke("placeEventOrders", { eventId: openedEvent.id });
-      setMessage({ appearance: "success", text: "Orders placed." });
+      setMessage({
+        appearance: "success",
+        text: `${openedEvent.restaurantName} orders placed.`,
+      });
       // The re-fetch flips the button to "Orders Placed" and shows the
       // preserved table; losing the race surfaces the service error instead,
       // and the same re-fetch in the next open shows who won.
@@ -693,14 +718,19 @@ const App = () => {
     teamIds: number[],
   ) =>
     runAction(async () => {
-      await invoke<EventSummary>("createEvent", {
-        restaurantId,
-        scheduledAt: localDateTimeToUtc(date, time),
-        teamIds,
-      });
+      const created = unwrap(
+        await invoke<EventSummary>("createEvent", {
+          restaurantId,
+          scheduledAt: localDateTimeToUtc(date, time),
+          teamIds,
+        }),
+      );
       setCreateOutingOpen(false);
       setOutingDefaultDate(null);
-      setMessage({ appearance: "success", text: "Event Created." });
+      setMessage({
+        appearance: "success",
+        text: `${created.restaurantName} event created.`,
+      });
       await refreshOutings();
       await refreshCalendar();
     });
@@ -809,7 +839,10 @@ const App = () => {
       setSubmission(created);
       setSelected(null);
       setPrefill(null);
-      setMessage({ appearance: "success", text: "Order submitted." });
+      setMessage({
+        appearance: "success",
+        text: `${created.restaurantName} order submitted.`,
+      });
       // The submit may have resurrected a deleted restaurant or linked one
       // into the pool server-side — refetch so the table reflects it.
       await refresh();
@@ -849,21 +882,31 @@ const App = () => {
 
   const handlePlaceOrder = () =>
     runAction(async () => {
+      const name = submission?.restaurantName;
       await invoke("placeOrder");
       setSubmission(null);
-      setMessage({ appearance: "success", text: "Order placed." });
+      setMessage({
+        appearance: "success",
+        text: name ? `${name} order placed.` : "Order placed.",
+      });
       await refreshOrders();
       await refreshStats();
     });
 
   const handleDelete = (restaurantId: number) =>
     runAction(async () => {
+      const name = (restaurants ?? []).find(
+        (restaurant) => restaurant.id === restaurantId,
+      )?.name;
       await invoke("deleteRestaurant", { restaurantId });
       setEditing(null);
       if (selected?.id === restaurantId) {
         setSelected(null);
       }
-      setMessage({ appearance: "information", text: "Restaurant deleted." });
+      setMessage({
+        appearance: "information",
+        text: name ? `${name} deleted.` : "Restaurant deleted.",
+      });
       await refresh();
     });
 
