@@ -142,13 +142,13 @@ const OutingsSection = ({
       <Inline space="space.200" alignBlock="center" grow="fill">
         <Heading as="h2">Today's Events</Heading>
         <Button appearance="primary" isDisabled={busy} onClick={onStartOuting}>
-          Be a Lunch Boss
+          Be a Lunch Boss (New Event)
         </Button>
       </Inline>
       {events === null ? (
         <LoadingIcon />
       ) : events.length === 0 ? (
-        <Text align="center">No events today yet — be a Lunch Boss!</Text>
+        <Text align="center">No events today yet. Be a Lunch Boss!</Text>
       ) : (
         <Box xcss={scrollRow}>
           {/* alignBlock="stretch" equalizes card heights across the row —

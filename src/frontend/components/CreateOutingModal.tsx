@@ -167,7 +167,7 @@ const CreateOutingModal = ({
         <Modal>
           <ModalHeader>
             <Inline grow="fill" spread="space-between" alignBlock="center">
-              <ModalTitle>Be a Lunch Boss</ModalTitle>
+              <ModalTitle>Be a Lunch Boss (New Event)</ModalTitle>
               <Pressable onClick={onCancel} isDisabled={busy}>
                 <Icon glyph="cross" label="Close" />
               </Pressable>
@@ -274,7 +274,7 @@ const CreateOutingModal = ({
                       }
                     }}
                   >
-                    Be the Boss
+                    Be the Boss (Create Event)
                   </Button>
                   <Button
                     appearance="subtle"
