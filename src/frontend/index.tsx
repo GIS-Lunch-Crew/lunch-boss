@@ -135,7 +135,11 @@ const nextAvailableSlot = (): { date: string; time: string } => {
   if (!rollsToTomorrow) {
     return { date: todayLocalDate(), time };
   }
-  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const tomorrow = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 1,
+  );
   const m = String(tomorrow.getMonth() + 1).padStart(2, "0");
   const d = String(tomorrow.getDate()).padStart(2, "0");
   return { date: `${tomorrow.getFullYear()}-${m}-${d}`, time };
@@ -185,6 +189,11 @@ const App = () => {
   // `orders`) so a History-tab date filter never silently skews the counts.
   const [stats, setStats] = useState<OrderStats | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
+  useEffect(() => {
+    if (!message) return;
+    const timer = setTimeout(() => setMessage(null), 6000);
+    return () => clearTimeout(timer);
+  }, [message]);
   const [busy, setBusy] = useState(false);
   const [environmentType, setEnvironmentType] = useState<string | null>(null);
   // Session-only greeting; fetched per page load, never persisted (§3.2).
@@ -943,166 +952,166 @@ const App = () => {
             <Tab>History</Tab>
           </TabList>
 
-        <TabPanel>
-          <Stack alignInline="start" grow="fill">
-            <Box xcss={tabPanelContentStyle}>
-              <Stack grow="fill" space="space.300">
-                <Stack grow="fill" space="space.150">
-                  <Heading as="h2">Current Order</Heading>
-                  <CurrentOrder
-                    key={orderKey}
-                    submission={submission}
-                    selected={selected}
-                    prefill={prefill}
-                    busy={busy}
-                    poolEmpty={(restaurants ?? []).length === 0}
-                    wheelOpen={wheelOpen}
-                    onCancelWheel={() => setWheelOpen(false)}
-                    onPickRandom={pickRandom}
-                    onCancelSelection={cancelSelection}
-                    onSubmitOrder={handleSubmitOrder}
-                    onSaveSubmission={handleSaveSubmission}
-                    onClearSubmission={handleClearSubmission}
-                    onPlaceOrder={handlePlaceOrder}
-                  />
-                </Stack>
+          <TabPanel>
+            <Stack alignInline="start" grow="fill">
+              <Box xcss={tabPanelContentStyle}>
+                <Stack grow="fill" space="space.300">
+                  <Stack grow="fill" space="space.150">
+                    <Heading as="h2">Current Order</Heading>
+                    <CurrentOrder
+                      key={orderKey}
+                      submission={submission}
+                      selected={selected}
+                      prefill={prefill}
+                      busy={busy}
+                      poolEmpty={(restaurants ?? []).length === 0}
+                      wheelOpen={wheelOpen}
+                      onCancelWheel={() => setWheelOpen(false)}
+                      onPickRandom={pickRandom}
+                      onCancelSelection={cancelSelection}
+                      onSubmitOrder={handleSubmitOrder}
+                      onSaveSubmission={handleSaveSubmission}
+                      onClearSubmission={handleClearSubmission}
+                      onPlaceOrder={handlePlaceOrder}
+                    />
+                  </Stack>
 
-                <Stack grow="fill" space="space.150">
-                  <Heading as="h2">Stats</Heading>
-                  <HomeStats stats={stats} />
-                </Stack>
+                  <Stack grow="fill" space="space.150">
+                    <Heading as="h2">Stats</Heading>
+                    <HomeStats stats={stats} />
+                  </Stack>
 
-                <OutingsSection
-                  title="Today's Events"
-                  events={outings}
-                  teams={allTeams}
-                  busy={busy}
-                  onStartOuting={handleStartOuting}
-                  onOpenEvent={handleOpenEvent}
-                  onClaimEvent={handleClaimEvent}
-                />
-              </Stack>
-            </Box>
-          </Stack>
-        </TabPanel>
-
-        <TabPanel>
-          <Stack alignInline="start" grow="fill">
-            <Box xcss={tabPanelContentStyle}>
-              <Stack grow="fill" space="space.300">
-                <Stack grow="fill" space="space.150">
-                  <RestaurantTable
-                    restaurants={restaurants}
-                    busy={busy}
-                    selectionDisabled={submission != null}
-                    selectedRestaurantId={
-                      selected?.id ?? submission?.restaurantId ?? null
-                    }
-                    onSelect={startSelection}
-                    onEdit={(restaurant) => {
-                      setMessage(null);
-                      setEditing(restaurant);
-                    }}
-                    onRemove={handleRemove}
-                  />
-                  <Inline>
-                    <Button
-                      appearance="primary"
-                      isDisabled={busy}
-                      onClick={() => setAddModalOpen(true)}
-                    >
-                      Add restaurant
-                    </Button>
-                  </Inline>
-                </Stack>
-
-                <RestaurantFormModal
-                  key={restaurantFormKey}
-                  isOpen={restaurantModalOpen}
-                  editing={editing}
-                  busy={busy}
-                  onSubmit={handleRestaurantSubmit}
-                  onCancel={closeRestaurantModal}
-                  onDelete={handleDelete}
-                />
-              </Stack>
-            </Box>
-          </Stack>
-        </TabPanel>
-
-        <TabPanel>
-          <Stack alignInline="start" grow="fill">
-            <Box xcss={teamsPanelContentStyle}>
-              <TeamsPanel
-                myTeams={myTeams}
-                allTeams={allTeams}
-                busy={busy}
-                onCreateOrJoinByName={handleCreateOrJoinByName}
-                onJoin={handleJoinTeam}
-                onLeave={handleLeaveTeam}
-              />
-            </Box>
-          </Stack>
-        </TabPanel>
-
-        <TabPanel>
-          <Stack alignInline="start" grow="fill">
-            <Box xcss={tabPanelContentStyle}>
-              <Stack grow="fill" space="space.300">
-                {calSelectedDate !== null && (
                   <OutingsSection
-                    title={calStripTitle}
-                    events={calDayEvents}
+                    title="Today's Events"
+                    events={outings}
                     teams={allTeams}
                     busy={busy}
-                    createDisabled={calSelectedIsPast}
-                    reserveSpace
-                    emptyText={
-                      calSelectedIsPast
-                        ? "No events were held on this day."
-                        : "No events on this day yet — be a Lunch Boss!"
-                    }
-                    onStartOuting={() =>
-                      handleStartOutingForDate(calSelectedDate)
-                    }
+                    onStartOuting={handleStartOuting}
                     onOpenEvent={handleOpenEvent}
                     onClaimEvent={handleClaimEvent}
                   />
-                )}
-                <EventsCalendar
-                  year={calMonth.year}
-                  month={calMonth.month}
-                  events={calEvents}
-                  selectedDate={calSelectedDate}
-                  todayDate={todayDate}
-                  onSelectDay={setCalSelectedDate}
-                  onPrevMonth={handleCalPrevMonth}
-                  onNextMonth={handleCalNextMonth}
-                />
-              </Stack>
-            </Box>
-          </Stack>
-        </TabPanel>
+                </Stack>
+              </Box>
+            </Stack>
+          </TabPanel>
 
-        <TabPanel>
-          <Stack alignInline="start" grow="fill">
-            <Box xcss={tabPanelContentStyle}>
-              <Stack grow="fill" space="space.150">
-                <Heading as="h2">Order History</Heading>
-                <OrderHistory
-                  key={`history-${orderFilter.from ?? ""}-${orderFilter.to ?? ""}`}
-                  orders={orders}
-                  from={orderFilter.from}
-                  to={orderFilter.to}
+          <TabPanel>
+            <Stack alignInline="start" grow="fill">
+              <Box xcss={tabPanelContentStyle}>
+                <Stack grow="fill" space="space.300">
+                  <Stack grow="fill" space="space.150">
+                    <RestaurantTable
+                      restaurants={restaurants}
+                      busy={busy}
+                      selectionDisabled={submission != null}
+                      selectedRestaurantId={
+                        selected?.id ?? submission?.restaurantId ?? null
+                      }
+                      onSelect={startSelection}
+                      onEdit={(restaurant) => {
+                        setMessage(null);
+                        setEditing(restaurant);
+                      }}
+                      onRemove={handleRemove}
+                    />
+                    <Inline>
+                      <Button
+                        appearance="primary"
+                        isDisabled={busy}
+                        onClick={() => setAddModalOpen(true)}
+                      >
+                        Add restaurant
+                      </Button>
+                    </Inline>
+                  </Stack>
+
+                  <RestaurantFormModal
+                    key={restaurantFormKey}
+                    isOpen={restaurantModalOpen}
+                    editing={editing}
+                    busy={busy}
+                    onSubmit={handleRestaurantSubmit}
+                    onCancel={closeRestaurantModal}
+                    onDelete={handleDelete}
+                  />
+                </Stack>
+              </Box>
+            </Stack>
+          </TabPanel>
+
+          <TabPanel>
+            <Stack alignInline="start" grow="fill">
+              <Box xcss={teamsPanelContentStyle}>
+                <TeamsPanel
+                  myTeams={myTeams}
+                  allTeams={allTeams}
                   busy={busy}
-                  reorderDisabled={submission != null}
-                  onFilterChange={(from, to) => setOrderFilter({ from, to })}
-                  onReorder={handleReorder}
+                  onCreateOrJoinByName={handleCreateOrJoinByName}
+                  onJoin={handleJoinTeam}
+                  onLeave={handleLeaveTeam}
                 />
-              </Stack>
-            </Box>
-          </Stack>
-        </TabPanel>
+              </Box>
+            </Stack>
+          </TabPanel>
+
+          <TabPanel>
+            <Stack alignInline="start" grow="fill">
+              <Box xcss={tabPanelContentStyle}>
+                <Stack grow="fill" space="space.300">
+                  {calSelectedDate !== null && (
+                    <OutingsSection
+                      title={calStripTitle}
+                      events={calDayEvents}
+                      teams={allTeams}
+                      busy={busy}
+                      createDisabled={calSelectedIsPast}
+                      reserveSpace
+                      emptyText={
+                        calSelectedIsPast
+                          ? "No events were held on this day."
+                          : "No events on this day yet — be a Lunch Boss!"
+                      }
+                      onStartOuting={() =>
+                        handleStartOutingForDate(calSelectedDate)
+                      }
+                      onOpenEvent={handleOpenEvent}
+                      onClaimEvent={handleClaimEvent}
+                    />
+                  )}
+                  <EventsCalendar
+                    year={calMonth.year}
+                    month={calMonth.month}
+                    events={calEvents}
+                    selectedDate={calSelectedDate}
+                    todayDate={todayDate}
+                    onSelectDay={setCalSelectedDate}
+                    onPrevMonth={handleCalPrevMonth}
+                    onNextMonth={handleCalNextMonth}
+                  />
+                </Stack>
+              </Box>
+            </Stack>
+          </TabPanel>
+
+          <TabPanel>
+            <Stack alignInline="start" grow="fill">
+              <Box xcss={tabPanelContentStyle}>
+                <Stack grow="fill" space="space.150">
+                  <Heading as="h2">Order History</Heading>
+                  <OrderHistory
+                    key={`history-${orderFilter.from ?? ""}-${orderFilter.to ?? ""}`}
+                    orders={orders}
+                    from={orderFilter.from}
+                    to={orderFilter.to}
+                    busy={busy}
+                    reorderDisabled={submission != null}
+                    onFilterChange={(from, to) => setOrderFilter({ from, to })}
+                    onReorder={handleReorder}
+                  />
+                </Stack>
+              </Box>
+            </Stack>
+          </TabPanel>
         </Tabs>
       </Stack>
 
