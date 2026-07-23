@@ -115,11 +115,11 @@ const CurrentOrder = ({
     if (!selected) {
       return (
         <Stack grow="fill" space="space.100">
-          <Text align="center">
+          <Text>
             No order in progress. Select a restaurant from your pool below, or
             let fate decide!
           </Text>
-          <Inline grow="fill" alignInline="center">
+          <Inline grow="fill">
             <Button isDisabled={busy || poolEmpty} onClick={onPickRandom}>
               Pick a random restaurant
             </Button>
@@ -133,7 +133,7 @@ const CurrentOrder = ({
     // fields seed the submission.
     return (
       <Stack grow="fill" space="space.100">
-        <Text align="center">
+        <Text>
           Ordering from <Strong>{selected.name}</Strong>. Submit to lock it in.
         </Text>
         <Label labelFor="orderItems">Order</Label>
@@ -161,7 +161,7 @@ const CurrentOrder = ({
           defaultValue={notes}
           onChange={(event) => setNotes(event.target.value)}
         />
-        <Inline space="space.100" grow="fill" alignInline="center">
+        <Inline space="space.100" grow="fill">
           <Button
             appearance="primary"
             isDisabled={busy || isInvalidTotal(total)}
@@ -189,17 +189,17 @@ const CurrentOrder = ({
   if (!editingDetails) {
     return (
       <Stack grow="fill" space="space.100">
-        <Text align="center">
+        <Text>
           Submitted for <Strong>{submission.restaurantName}</Strong>. The
           restaurant is locked. Clear the order to choose a different one.
         </Text>
-        <Text align="center">Order: {submission.items ?? "—"}</Text>
-        <Text align="center">
+        <Text>Order: {submission.items ?? "—"}</Text>
+        <Text>
           Total:{" "}
           {submission.total != null ? `$${submission.total.toFixed(2)}` : "—"}
         </Text>
-        <Text align="center">Notes: {submission.notes ?? "—"}</Text>
-        <Inline space="space.100" grow="fill" alignInline="center">
+        <Text>Notes: {submission.notes ?? "—"}</Text>
+        <Inline space="space.100" grow="fill">
           <Button appearance="primary" isDisabled={busy} onClick={onPlaceOrder}>
             Place order
           </Button>
@@ -221,7 +221,7 @@ const CurrentOrder = ({
   // --- Stage: editing a submitted order ---
   return (
     <Stack grow="fill" space="space.100">
-      <Text align="center">
+      <Text>
         Editing order for <Strong>{submission.restaurantName}</Strong>. The
         restaurant stays locked. Clear the order to choose a different one.
       </Text>
@@ -250,7 +250,7 @@ const CurrentOrder = ({
         defaultValue={notes}
         onChange={(event) => setNotes(event.target.value)}
       />
-      <Inline space="space.100" grow="fill" alignInline="center">
+      <Inline space="space.100" grow="fill">
         <Button
           appearance="primary"
           isDisabled={busy || isInvalidTotal(total)}

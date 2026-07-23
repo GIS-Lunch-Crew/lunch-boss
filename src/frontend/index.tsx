@@ -66,6 +66,7 @@ const teamsPanelContentStyle = xcss({
 // Section headings default to left-aligned text; this centers them within
 // their (already full-width, via the ambient Stack's default stretch) box.
 const centeredHeadingStyle = xcss({ textAlign: "center" });
+const messageSlot = xcss({ height: "2.25rem" });
 
 // User-facing text for each addRestaurant outcome (CONTEXT.md §3.10).
 const OUTCOME_MESSAGES: Record<AddRestaurantResult["outcome"], Message> = {
@@ -511,7 +512,10 @@ const App = () => {
   const handleClaimEvent = (event: EventSummary) =>
     runAction(async () => {
       await invoke("claimEvent", { eventId: event.id });
-      setMessage({ appearance: "success", text: "You are now the Lunch Boss." });
+      setMessage({
+        appearance: "success",
+        text: "You are now the Lunch Boss.",
+      });
       await refreshOutings();
       await refreshEventDetail(event.id);
     });
@@ -533,7 +537,10 @@ const App = () => {
       setEventDetail(null);
       setMessage({
         appearance: "information",
-        text: result.outcome === "deleted" ? "Event deleted." : "Bossdom abandoned.",
+        text:
+          result.outcome === "deleted"
+            ? "Event deleted."
+            : "Bossdom abandoned.",
       });
       await refreshOutings();
     });
@@ -793,35 +800,40 @@ const App = () => {
   const outingDefaultSlot = nextAvailableSlot();
 
   return (
-    <Stack grow="fill" space="space.300">
-      <Inline grow="fill" spread="space-between" alignBlock="center">
-        <Heading as="h1">Lunch Boss</Heading>
-        {environmentType !== null && environmentType !== "PRODUCTION" && (
-          <Button isDisabled={busy} onClick={handleRunMigrations}>
-            Run migrations (dev)
-          </Button>
-        )}
-      </Inline>
+    <Stack grow="fill" space="space.150">
+      <Stack space="space.050">
+        <Inline grow="fill" spread="space-between" alignBlock="center">
+          <Heading as="h1">Lunch Boss</Heading>
+          {environmentType !== null && environmentType !== "PRODUCTION" && (
+            <Button isDisabled={busy} onClick={handleRunMigrations}>
+              Run migrations (dev)
+            </Button>
+          )}
+        </Inline>
 
-      {displayName && <Text>Ordering as {displayName}</Text>}
+        {displayName && <Text>Ordering as {displayName}</Text>}
 
-      {message && (
-        <SectionMessage appearance={message.appearance}>
-          <Text>{message.text}</Text>
-        </SectionMessage>
-      )}
+        <Box xcss={messageSlot}>
+          {message && (
+            <SectionMessage appearance={message.appearance}>
+              <Text>{message.text}</Text>
+            </SectionMessage>
+          )}
+        </Box>
+      </Stack>
 
-      <Tabs
-        id="lunch-boss-tabs"
-        selected={activeTab}
-        onChange={(index) => setActiveTab(index)}
-      >
-        <TabList>
-          <Tab>Home</Tab>
-          <Tab>Restaurants</Tab>
-          <Tab>Teams</Tab>
-          <Tab>History</Tab>
-        </TabList>
+      <Stack space="space.100">
+        <Tabs
+          id="lunch-boss-tabs"
+          selected={activeTab}
+          onChange={(index) => setActiveTab(index)}
+        >
+          <TabList>
+            <Tab>Home</Tab>
+            <Tab>Restaurants</Tab>
+            <Tab>Teams</Tab>
+            <Tab>History</Tab>
+          </TabList>
 
         <TabPanel>
           <Stack alignInline="center" grow="fill">
@@ -924,7 +936,6 @@ const App = () => {
             <Box xcss={tabPanelContentStyle}>
               <Stack grow="fill" space="space.300">
                 <Stack grow="fill" space="space.150">
-                  <Heading as="h2">My Restaurant Pool</Heading>
                   <RestaurantTable
                     restaurants={restaurants}
                     busy={busy}
@@ -998,7 +1009,8 @@ const App = () => {
             </Box>
           </Stack>
         </TabPanel>
-      </Tabs>
+        </Tabs>
+      </Stack>
     </Stack>
   );
 };

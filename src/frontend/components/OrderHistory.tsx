@@ -95,7 +95,7 @@ const OrderHistory = ({
             isDisabled={busy || reorderDisabled}
             onClick={() => onReorder(order)}
           >
-            Re-order
+            Re-Order
           </Button>
         ),
       },
@@ -103,7 +103,7 @@ const OrderHistory = ({
   }));
 
   return (
-    <Stack grow="fill" space="space.100">
+    <Stack grow="fill" space="space.300">
       <Inline space="space.200" alignBlock="end">
         <Stack space="space.050">
           <Label labelFor="historyFrom">From</Label>

@@ -16,11 +16,9 @@ const HomeStats = ({ stats }: Props) => {
 
   return (
     <Stack grow="fill" space="space.100">
-      <Text align="center">
-        Restaurants in your pool: {stats.totalRestaurants}
-      </Text>
-      <Text align="center">Orders placed: {stats.totalOrders}</Text>
-      <Text align="center">
+      <Text>Restaurants in your pool: {stats.totalRestaurants}</Text>
+      <Text>Orders placed: {stats.totalOrders}</Text>
+      <Text>
         Most-picked restaurant:{" "}
         {stats.topRestaurant
           ? `${stats.topRestaurant.restaurantName} (${stats.topRestaurant.count}x)`

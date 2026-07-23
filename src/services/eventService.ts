@@ -67,6 +67,7 @@ export const createEvent = async (
     originalScheduledAt: input.scheduledAt,
     placedAt: null,
     teamIds: input.teamIds,
+    hasMyOrder: false,
   };
 };
 
@@ -79,18 +80,22 @@ export const getTodaysEvents = async (
     input.from,
     input.to,
   );
-  const teamRows = await eventTeamRepository.listByEvents(
-    rows.map((row) => row.id),
-  );
+  const eventIds = rows.map((row) => row.id);
+  const [teamRows, orderedEventIds] = await Promise.all([
+    eventTeamRepository.listByEvents(eventIds),
+    eventOrderRepository.listEventIdsWithOrder(accountId, eventIds),
+  ]);
   const teamIdsByEvent = new Map<number, number[]>();
   for (const { eventId, teamId } of teamRows) {
     const list = teamIdsByEvent.get(eventId) ?? [];
     list.push(teamId);
     teamIdsByEvent.set(eventId, list);
   }
+  const orderedSet = new Set(orderedEventIds);
   return rows.map((row) => ({
     ...row,
     teamIds: teamIdsByEvent.get(row.id) ?? [],
+    hasMyOrder: orderedSet.has(row.id),
   }));
 };
 
@@ -109,11 +114,13 @@ export const getEvent = async (
     eventTeamRepository.listByEvents([row.id]),
     eventOrderRepository.listByEvent(eventId),
   ]);
+  const myOrder = orders.find((order) => order.accountId === accountId) ?? null;
   return {
     ...row,
     teamIds: teamRows.map(({ teamId }) => teamId),
     orders,
-    myOrder: orders.find((order) => order.accountId === accountId) ?? null,
+    myOrder,
+    hasMyOrder: myOrder !== null,
   };
 };
 
