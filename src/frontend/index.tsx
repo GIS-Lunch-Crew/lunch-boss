@@ -64,6 +64,10 @@ const teamsPanelContentStyle = xcss({
   minWidth: "380px",
 });
 const messageSlot = xcss({ height: "2.25rem" });
+// Current Order/Stats sit side by side in an Inline that wraps once the row
+// can no longer fit both min-widths (no CSS media queries in UI Kit).
+const currentOrderColumnStyle = xcss({ flexGrow: 1, minWidth: "420px" });
+const statsColumnStyle = xcss({ flexGrow: 1, minWidth: "280px", maxWidth: "360px" });
 
 // User-facing text for each addRestaurant outcome (CONTEXT.md §3.10).
 const OUTCOME_MESSAGES: Record<AddRestaurantResult["outcome"], Message> = {
@@ -836,30 +840,36 @@ const App = () => {
           <Stack alignInline="start" grow="fill">
             <Box xcss={tabPanelContentStyle}>
               <Stack grow="fill" space="space.300">
-                <Stack grow="fill" space="space.150">
-                  <Heading as="h2">Current Order</Heading>
-                  <CurrentOrder
-                    key={orderKey}
-                    submission={submission}
-                    selected={selected}
-                    prefill={prefill}
-                    busy={busy}
-                    poolEmpty={(restaurants ?? []).length === 0}
-                    wheelOpen={wheelOpen}
-                    onCancelWheel={() => setWheelOpen(false)}
-                    onPickRandom={pickRandom}
-                    onCancelSelection={cancelSelection}
-                    onSubmitOrder={handleSubmitOrder}
-                    onSaveSubmission={handleSaveSubmission}
-                    onClearSubmission={handleClearSubmission}
-                    onPlaceOrder={handlePlaceOrder}
-                  />
-                </Stack>
+                <Inline shouldWrap space="space.300" alignBlock="start" grow="fill">
+                  <Box xcss={currentOrderColumnStyle}>
+                    <Stack grow="fill" space="space.150">
+                      <Heading as="h2">Current Order</Heading>
+                      <CurrentOrder
+                        key={orderKey}
+                        submission={submission}
+                        selected={selected}
+                        prefill={prefill}
+                        busy={busy}
+                        poolEmpty={(restaurants ?? []).length === 0}
+                        wheelOpen={wheelOpen}
+                        onCancelWheel={() => setWheelOpen(false)}
+                        onPickRandom={pickRandom}
+                        onCancelSelection={cancelSelection}
+                        onSubmitOrder={handleSubmitOrder}
+                        onSaveSubmission={handleSaveSubmission}
+                        onClearSubmission={handleClearSubmission}
+                        onPlaceOrder={handlePlaceOrder}
+                      />
+                    </Stack>
+                  </Box>
 
-                <Stack grow="fill" space="space.150">
-                  <Heading as="h2">Stats</Heading>
-                  <HomeStats stats={stats} />
-                </Stack>
+                  <Box xcss={statsColumnStyle}>
+                    <Stack space="space.150">
+                      <Heading as="h2">Stats</Heading>
+                      <HomeStats stats={stats} />
+                    </Stack>
+                  </Box>
+                </Inline>
 
                 <OutingsSection
                   events={outings}
