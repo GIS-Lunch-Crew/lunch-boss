@@ -13,8 +13,14 @@ import {
   Text,
   Textfield,
   Tooltip,
+  xcss,
 } from "@forge/react";
 import type { Restaurant } from "../../types";
+import { SECTION_MIN_WIDTH } from "../layout";
+
+// Floor width shared with the other tables — isFixedSize + per-column width
+// keeps it stable instead of resizing as rows load.
+const tableWrapStyle = xcss({ minWidth: SECTION_MIN_WIDTH });
 
 type Props = {
   restaurants: Restaurant[] | null;
@@ -116,7 +122,7 @@ const RestaurantTable = ({
         content: column.label,
         width: 15,
       })),
-      { key: "actions", content: "" },
+      { key: "actions", content: "", width: 20 },
     ],
   };
 
@@ -258,13 +264,16 @@ const RestaurantTable = ({
           {filteredRestaurants.length === 0 ? (
             <Text>No restaurants match your search.</Text>
           ) : (
-            <DynamicTable
-              head={head}
-              rows={rows}
-              highlightedRowIndex={
-                highlightedRowIndex === -1 ? undefined : [highlightedRowIndex]
-              }
-            />
+            <Box xcss={tableWrapStyle}>
+              <DynamicTable
+                head={head}
+                rows={rows}
+                isFixedSize
+                highlightedRowIndex={
+                  highlightedRowIndex === -1 ? undefined : [highlightedRowIndex]
+                }
+              />
+            </Box>
           )}
         </Stack>
       )}

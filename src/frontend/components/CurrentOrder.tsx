@@ -119,7 +119,7 @@ const CurrentOrder = ({
             No order in progress. Select a restaurant from your pool below, or
             let fate decide!
           </Text>
-          <Inline>
+          <Inline grow="fill">
             <Button isDisabled={busy || poolEmpty} onClick={onPickRandom}>
               Pick a random restaurant
             </Button>
@@ -161,7 +161,7 @@ const CurrentOrder = ({
           defaultValue={notes}
           onChange={(event) => setNotes(event.target.value)}
         />
-        <Inline space="space.100">
+        <Inline space="space.100" grow="fill">
           <Button
             appearance="primary"
             isDisabled={busy || isInvalidTotal(total)}
@@ -199,7 +199,7 @@ const CurrentOrder = ({
           {submission.total != null ? `$${submission.total.toFixed(2)}` : "—"}
         </Text>
         <Text>Notes: {submission.notes ?? "—"}</Text>
-        <Inline space="space.100">
+        <Inline space="space.100" grow="fill">
           <Button appearance="primary" isDisabled={busy} onClick={onPlaceOrder}>
             Place order
           </Button>
@@ -250,7 +250,7 @@ const CurrentOrder = ({
         defaultValue={notes}
         onChange={(event) => setNotes(event.target.value)}
       />
-      <Inline space="space.100">
+      <Inline space="space.100" grow="fill">
         <Button
           appearance="primary"
           isDisabled={busy || isInvalidTotal(total)}

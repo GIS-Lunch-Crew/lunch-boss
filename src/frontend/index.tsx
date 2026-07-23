@@ -27,6 +27,7 @@ import OutingsSection from "./components/OutingsSection";
 import CreateOutingModal from "./components/CreateOutingModal";
 import EventDetailModal from "./components/EventDetailModal";
 import EditEventModal from "./components/EditEventModal";
+import { SECTION_MIN_WIDTH } from "./layout";
 import type {
   AbandonEventResult,
   AddRestaurantResult,
@@ -47,7 +48,21 @@ type Message = {
   text: string;
 };
 
-const tabPanelTopSpacing = xcss({ paddingTop: "space.200" });
+// Tab content is capped well short of the full viewport and left-justified
+// (via the wrapping Stack's alignInline="start") rather than stretching
+// edge-to-edge. minWidth keeps the table-bearing tabs from ever going
+// narrower than the tables themselves need.
+const tabPanelContentStyle = xcss({
+  paddingTop: "space.200",
+  width: "88%",
+  minWidth: SECTION_MIN_WIDTH,
+});
+// Teams has no table and far less content — half the standard tab width.
+const teamsPanelContentStyle = xcss({
+  paddingTop: "space.200",
+  width: "44%",
+  minWidth: "380px",
+});
 const messageSlot = xcss({ height: "2.25rem" });
 
 // User-facing text for each addRestaurant outcome (CONTEXT.md §3.10).
@@ -817,8 +832,9 @@ const App = () => {
             <Tab>History</Tab>
           </TabList>
 
-          <TabPanel>
-            <Box xcss={tabPanelTopSpacing}>
+        <TabPanel>
+          <Stack alignInline="start" grow="fill">
+            <Box xcss={tabPanelContentStyle}>
               <Stack grow="fill" space="space.300">
                 <Stack grow="fill" space="space.150">
                   <Heading as="h2">Current Order</Heading>
@@ -840,6 +856,11 @@ const App = () => {
                   />
                 </Stack>
 
+                <Stack grow="fill" space="space.150">
+                  <Heading as="h2">Stats</Heading>
+                  <HomeStats stats={stats} />
+                </Stack>
+
                 <OutingsSection
                   events={outings}
                   teams={allTeams}
@@ -848,11 +869,6 @@ const App = () => {
                   onOpenEvent={handleOpenEvent}
                   onClaimEvent={handleClaimEvent}
                 />
-
-                <Stack grow="fill" space="space.150">
-                  <Heading as="h2">Stats</Heading>
-                  <HomeStats stats={stats} />
-                </Stack>
               </Stack>
 
               <EventDetailModal
@@ -905,10 +921,12 @@ const App = () => {
                 onCancel={() => setCreateOutingOpen(false)}
               />
             </Box>
-          </TabPanel>
+          </Stack>
+        </TabPanel>
 
-          <TabPanel>
-            <Box xcss={tabPanelTopSpacing}>
+        <TabPanel>
+          <Stack alignInline="start" grow="fill">
+            <Box xcss={tabPanelContentStyle}>
               <Stack grow="fill" space="space.300">
                 <Stack grow="fill" space="space.150">
                   <RestaurantTable
@@ -947,10 +965,12 @@ const App = () => {
                 />
               </Stack>
             </Box>
-          </TabPanel>
+          </Stack>
+        </TabPanel>
 
-          <TabPanel>
-            <Box xcss={tabPanelTopSpacing}>
+        <TabPanel>
+          <Stack alignInline="start" grow="fill">
+            <Box xcss={teamsPanelContentStyle}>
               <TeamsPanel
                 myTeams={myTeams}
                 allTeams={allTeams}
@@ -960,10 +980,12 @@ const App = () => {
                 onLeave={handleLeaveTeam}
               />
             </Box>
-          </TabPanel>
+          </Stack>
+        </TabPanel>
 
-          <TabPanel>
-            <Box xcss={tabPanelTopSpacing}>
+        <TabPanel>
+          <Stack alignInline="start" grow="fill">
+            <Box xcss={tabPanelContentStyle}>
               <Stack grow="fill" space="space.150">
                 <Heading as="h2">Order History</Heading>
                 <OrderHistory
@@ -978,7 +1000,8 @@ const App = () => {
                 />
               </Stack>
             </Box>
-          </TabPanel>
+          </Stack>
+        </TabPanel>
         </Tabs>
       </Stack>
     </Stack>
