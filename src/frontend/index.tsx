@@ -48,8 +48,8 @@ type Message = {
   text: string;
 };
 
-// Tab content is capped well short of the full viewport and centered (via
-// the wrapping Stack's alignInline="center") rather than stretching
+// Tab content is capped well short of the full viewport and left-justified
+// (via the wrapping Stack's alignInline="start") rather than stretching
 // edge-to-edge. minWidth keeps the table-bearing tabs from ever going
 // narrower than the tables themselves need.
 const tabPanelContentStyle = xcss({
@@ -63,9 +63,6 @@ const teamsPanelContentStyle = xcss({
   width: "44%",
   minWidth: "380px",
 });
-// Section headings default to left-aligned text; this centers them within
-// their (already full-width, via the ambient Stack's default stretch) box.
-const centeredHeadingStyle = xcss({ textAlign: "center" });
 const messageSlot = xcss({ height: "2.25rem" });
 
 // User-facing text for each addRestaurant outcome (CONTEXT.md §3.10).
@@ -836,13 +833,11 @@ const App = () => {
           </TabList>
 
         <TabPanel>
-          <Stack alignInline="center" grow="fill">
+          <Stack alignInline="start" grow="fill">
             <Box xcss={tabPanelContentStyle}>
               <Stack grow="fill" space="space.300">
                 <Stack grow="fill" space="space.150">
-                  <Box xcss={centeredHeadingStyle}>
-                    <Heading as="h2">Current Order</Heading>
-                  </Box>
+                  <Heading as="h2">Current Order</Heading>
                   <CurrentOrder
                     key={orderKey}
                     submission={submission}
@@ -861,6 +856,11 @@ const App = () => {
                   />
                 </Stack>
 
+                <Stack grow="fill" space="space.150">
+                  <Heading as="h2">Stats</Heading>
+                  <HomeStats stats={stats} />
+                </Stack>
+
                 <OutingsSection
                   events={outings}
                   teams={allTeams}
@@ -869,13 +869,6 @@ const App = () => {
                   onOpenEvent={handleOpenEvent}
                   onClaimEvent={handleClaimEvent}
                 />
-
-                <Stack grow="fill" space="space.150">
-                  <Box xcss={centeredHeadingStyle}>
-                    <Heading as="h2">Stats</Heading>
-                  </Box>
-                  <HomeStats stats={stats} />
-                </Stack>
               </Stack>
 
               <EventDetailModal
@@ -932,7 +925,7 @@ const App = () => {
         </TabPanel>
 
         <TabPanel>
-          <Stack alignInline="center" grow="fill">
+          <Stack alignInline="start" grow="fill">
             <Box xcss={tabPanelContentStyle}>
               <Stack grow="fill" space="space.300">
                 <Stack grow="fill" space="space.150">
@@ -976,7 +969,7 @@ const App = () => {
         </TabPanel>
 
         <TabPanel>
-          <Stack alignInline="center" grow="fill">
+          <Stack alignInline="start" grow="fill">
             <Box xcss={teamsPanelContentStyle}>
               <TeamsPanel
                 myTeams={myTeams}
@@ -991,7 +984,7 @@ const App = () => {
         </TabPanel>
 
         <TabPanel>
-          <Stack alignInline="center" grow="fill">
+          <Stack alignInline="start" grow="fill">
             <Box xcss={tabPanelContentStyle}>
               <Stack grow="fill" space="space.150">
                 <Heading as="h2">Order History</Heading>

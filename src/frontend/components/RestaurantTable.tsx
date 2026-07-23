@@ -122,7 +122,7 @@ const RestaurantTable = ({
         content: column.label,
         width: 15,
       })),
-      { key: "actions", content: "" },
+      { key: "actions", content: "", width: 20 },
     ],
   };
 
