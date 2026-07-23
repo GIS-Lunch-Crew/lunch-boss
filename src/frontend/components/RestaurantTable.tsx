@@ -212,7 +212,7 @@ const RestaurantTable = ({
       ) : restaurants.length === 0 ? (
         <Text>No restaurants exist yet. Add one above.</Text>
       ) : (
-        <Stack space="space.100">
+        <Stack space="space.200">
           <Inline space="space.300" alignBlock="center">
             <Heading as="h2">My Restaurant Pool</Heading>
             <Inline space="space.200" alignBlock="center">
