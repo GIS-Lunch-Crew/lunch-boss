@@ -42,6 +42,14 @@ type Props = {
   busy: boolean;
   // Local YYYY-MM-DD, used as the DatePicker's minDate so past days are greyed.
   todayDate: string;
+  // The Date field's default value, recomputed by the parent on every
+  // render: today, or tomorrow if it's past the last bookable slot (23:30).
+  defaultDate: string;
+  // The next bookable half-hour slot from now (e.g. "11:30" at 11:15). Used
+  // to trim the Time dropdown down to from-now-onward options when the
+  // picked date is today, so opening it never requires scrolling past
+  // already-past times. Not used to pre-select a value.
+  earliestTimeToday: string;
   // A wheel result the host routed here; syncs into the Restaurant field.
   wheelWinner: { id: number; name: string } | null;
   // Tags the next wheel result for this panel before its Frame mounts.
@@ -63,19 +71,32 @@ const CreateOutingModal = ({
   teams,
   busy,
   todayDate,
+  defaultDate,
+  earliestTimeToday,
   wheelWinner,
   onOpenWheel,
   onCreate,
   onCancel,
 }: Props) => {
   const [restaurantId, setRestaurantId] = useState<number | null>(null);
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(defaultDate);
   const [time, setTime] = useState("");
   // CheckboxGroup values are strings; converted to numbers on submit.
   const [teamIds, setTeamIds] = useState<string[]>([]);
   // Content-swap flag: while true the body shows the wheel Frame in place of
   // the form (the modal never unmounts, so the other fields survive).
   const [showWheel, setShowWheel] = useState(false);
+
+  // The modal itself never unmounts (only its inner <Modal> content does), so
+  // without this the Date field would keep showing whatever day was left
+  // from the previous time it was opened instead of a fresh "today" default.
+  useEffect(() => {
+    if (isOpen) {
+      setDate(defaultDate);
+      setTime("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // A wheel result arrived — fill the Restaurant field and swap back to the
   // form. Fires only when wheelWinner changes (the host sends a fresh object
@@ -118,6 +139,20 @@ const CreateOutingModal = ({
     label: team.name,
     value: String(team.id),
   }));
+
+  // Today only shows from-now-onward slots, so opening the dropdown never
+  // needs scrolling past times that are already too late to pick. Any other
+  // date shows the full day (falls back to the full list if, in some edge
+  // case, filtering would leave nothing to pick).
+  const timesForPicker =
+    date === todayDate
+      ? (() => {
+          const upcoming = HALF_HOUR_TIMES.filter(
+            (slot) => slot >= earliestTimeToday,
+          );
+          return upcoming.length > 0 ? upcoming : HALF_HOUR_TIMES;
+        })()
+      : HALF_HOUR_TIMES;
 
   const canCreate =
     !busy &&
@@ -191,7 +226,8 @@ const CreateOutingModal = ({
                         <DatePicker
                           id="outingDate"
                           minDate={todayDate}
-                          placeholder={todayDate}
+                          defaultValue={defaultDate}
+                          placeholder={defaultDate}
                           onChange={(value) => setDate(value)}
                         />
                       </Box>
@@ -201,9 +237,9 @@ const CreateOutingModal = ({
                       <Box xcss={timeWidth}>
                         <TimePicker
                           id="outingTime"
-                          timeFormat="HH:mm"
-                          times={HALF_HOUR_TIMES}
-                          placeholder="13:30"
+                          timeFormat="h:mm A"
+                          times={timesForPicker}
+                          placeholder="1:30 PM"
                           timeIsEditable
                           onChange={(value) => setTime(value)}
                         />
