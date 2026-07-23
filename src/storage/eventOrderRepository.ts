@@ -96,6 +96,27 @@ export const remove = async (
     .execute();
 };
 
+// Which of the given event ids the caller has a submitted order on, for
+// assembling EventSummary.hasMyOrder in one query rather than per-event.
+export const listEventIdsWithOrder = async (
+  accountId: string,
+  eventIds: number[],
+): Promise<number[]> => {
+  if (eventIds.length === 0) {
+    return [];
+  }
+  const placeholders = eventIds.map(() => "?").join(", ");
+  const result = await sql
+    .prepare<{ eventId: number }>(
+      `SELECT event_id AS eventId
+       FROM event_orders
+       WHERE account_id = ? AND event_id IN (${placeholders})`,
+    )
+    .bindParams(accountId, ...eventIds)
+    .execute();
+  return result.rows.map((row) => row.eventId);
+};
+
 // Delete guard for the event (and, indirectly, visibility).
 export const countByEvent = async (eventId: number): Promise<number> => {
   const result = await sql
