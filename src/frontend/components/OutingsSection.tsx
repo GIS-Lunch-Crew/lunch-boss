@@ -92,8 +92,12 @@ const fillBoxStyle = xcss({ height: "100%", width: "100%" });
 // Nudges the Claim Bossdom button down so it rides the same line as the
 // User chip on neighboring cards (the chip renders a touch taller).
 const claimNudgeStyle = xcss({ paddingBlockStart: "space.150" });
-// One cell of the 2-wide team grid.
-const teamCellStyle = xcss({ width: "50%" });
+// One cell of the 2-wide team grid. Right padding gives the pills breathing
+// room without breaking the no-gap Inline (which keeps columns aligned row
+// over row); the last cell in a row loses the padding so it stays flush with
+// the card's right edge.
+const teamCellStyle = xcss({ width: "50%", paddingInlineEnd: "space.100" });
+const teamCellLastStyle = xcss({ width: "50%" });
 // A team name's pill — faded teal, fully rounded, bordered. Uses the
 // design system's own pre-faded fill token rather than the `opacity`
 // property: opacity applies to the whole subtree, so it was fading the
@@ -183,8 +187,15 @@ const OutingsSection = ({
                   <Stack space="space.050" grow="fill" alignInline="stretch">
                     {teamRows.map((row) => (
                       <Inline key={row[0]} space="space.0" grow="fill">
-                        {row.map((id) => (
-                          <Box key={id} xcss={teamCellStyle}>
+                        {row.map((id, index) => (
+                          <Box
+                            key={id}
+                            xcss={
+                              index < row.length - 1
+                                ? teamCellStyle
+                                : teamCellLastStyle
+                            }
+                          >
                             <Box xcss={teamPillStyle}>
                               <Text>{teamName(id)}</Text>
                             </Box>
