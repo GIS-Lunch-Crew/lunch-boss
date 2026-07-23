@@ -164,6 +164,7 @@ const EditEventModal = ({
                       id="editEventDate"
                       minDate={todayDate}
                       defaultValue={toLocalDate(event.scheduledAt)}
+                      placeholder={toLocalDate(event.scheduledAt)}
                       onChange={(value) => setDate(value)}
                     />
                   </Box>
@@ -173,7 +174,7 @@ const EditEventModal = ({
                   <Box xcss={timeWidth}>
                     <TimePicker
                       id="editEventTime"
-                      timeFormat="HH:mm"
+                      timeFormat="h:mm A"
                       times={HALF_HOUR_TIMES}
                       defaultValue={toLocalTime(event.scheduledAt)}
                       timeIsEditable
